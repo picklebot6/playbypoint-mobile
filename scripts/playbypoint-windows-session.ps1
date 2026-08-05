@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Edit these three values for the Windows PC.
-$AndroidSdk = 'D:\Android\Sdk'
+$AndroidSdk = 'D:\AndroidSDK'
 $AndroidAvdHome = 'D:\Android\Avd'
 $AvdName = 'PlayByPoint_API_35'
 
