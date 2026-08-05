@@ -65,7 +65,7 @@ readonly APPIUM_LOG="${APPIUM_LOG:-${TMPDIR:-/tmp}/playbypoint-appium.log}"
 
 SESSION_ID=""
 APPIUM_PID=""
-PYTHON_BIN=""
+PYTHON_CMD=()
 
 usage() {
   cat <<'USAGE'
@@ -113,12 +113,12 @@ command_exists() {
 }
 
 json_quote() {
-  "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
+  "${PYTHON_CMD[@]}" -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
 }
 
 json_value() {
   local path="$1"
-  "$PYTHON_BIN" -c '
+  "${PYTHON_CMD[@]}" -c '
 import json, sys
 keys = sys.argv[1].split(".")
 try:
@@ -239,7 +239,7 @@ type_into() {
   local value="$2"
   local body
   api POST "/session/${SESSION_ID}/element/${element_id}/clear" '{}' >/dev/null 2>&1 || true
-  body="$(printf '%s' "$value" | "$PYTHON_BIN" -c '
+  body="$(printf '%s' "$value" | "${PYTHON_CMD[@]}" -c '
 import json, sys
 text = sys.stdin.read()
 print(json.dumps({"text": text, "value": list(text)}))
@@ -285,7 +285,7 @@ dismiss_notification_prompt() {
 
     if command_exists adb; then
       hierarchy="$(adb "${adb_args[@]}" exec-out uiautomator dump /dev/tty 2>/dev/null || true)"
-      tap_coordinates="$(printf '%s' "$hierarchy" | "$PYTHON_BIN" -c '
+      tap_coordinates="$(printf '%s' "$hierarchy" | "${PYTHON_CMD[@]}" -c '
 import re, sys, xml.etree.ElementTree as ET
 data = sys.stdin.read()
 start, end = data.find("<?xml"), data.find("</hierarchy>")
@@ -395,7 +395,7 @@ booking_target_date_label() {
   if command_exists adb; then
     emulator_date="$(adb "${adb_args[@]}" shell date +%Y-%m-%d 2>/dev/null | tr -d '\r')"
   fi
-  printf '%s' "$emulator_date" | "$PYTHON_BIN" -c '
+  printf '%s' "$emulator_date" | "${PYTHON_CMD[@]}" -c '
 from datetime import datetime, timedelta
 import sys
 value = sys.stdin.read().strip()
@@ -408,7 +408,7 @@ print((today + timedelta(days=7)).strftime("%a, %d, %b"))
 }
 
 parse_selected_court_hierarchy() {
-  "$PYTHON_BIN" -c '
+  "${PYTHON_CMD[@]}" -c '
 import re, sys, xml.etree.ElementTree as ET
 data = sys.stdin.read()
 start, end = data.find("<?xml"), data.find("</hierarchy>")
@@ -599,13 +599,15 @@ main() {
   [[ $# -eq 0 ]] || { usage >&2; die "Unexpected arguments"; }
   command_exists curl || die "curl is required"
   if command_exists python3; then
-    PYTHON_BIN="$(command -v python3)"
+    PYTHON_CMD=(python3)
   elif command_exists python; then
-    PYTHON_BIN="$(command -v python)"
+    PYTHON_CMD=(python)
+  elif command_exists py; then
+    PYTHON_CMD=(py -3)
   else
     die "Python 3 is required"
   fi
-  "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if sys.version_info.major == 3 else 1)' || \
+  "${PYTHON_CMD[@]}" -c 'import sys; raise SystemExit(0 if sys.version_info.major == 3 else 1)' || \
     die "Python 3 is required"
   [[ -n "${PLAYBYPOINT_EMAIL:-}" ]] || die "PLAYBYPOINT_EMAIL is required"
   [[ -n "${PLAYBYPOINT_PASSWORD:-}" ]] || die "PLAYBYPOINT_PASSWORD is required"
