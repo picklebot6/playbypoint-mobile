@@ -47,6 +47,7 @@ readonly NOTIFICATION_PROMPT_TIMEOUT="${NOTIFICATION_PROMPT_TIMEOUT:-3}"
 readonly BOOKING_TIMEOUT="${BOOKING_TIMEOUT:-20}"
 readonly RUN_BOOKING_FLOW="${RUN_BOOKING_FLOW:-1}"
 readonly APPIUM_START_TIMEOUT="${APPIUM_START_TIMEOUT:-60}"
+readonly TIME_SLOT_AVAILABILITY_TIMEOUT="${TIME_SLOT_AVAILABILITY_TIMEOUT:-180}"
 
 # Editable consecutive booking slots. Keep the labels exactly as displayed by
 # Playbypoint; the booking flow selects each entry in this order.
@@ -416,6 +417,32 @@ scroll_booking_to_bottom() {
   printf 'Reached the bottom of booking availability.\n'
 }
 
+wait_for_time_slot_availability() {
+  local deadline=$((SECONDS + TIME_SLOT_AVAILABILITY_TIMEOUT))
+  local slot="${BOOKING_TIME_SLOTS[0]:-}" attempts=0
+  [[ -n "$slot" ]] || die "BOOKING_TIME_SLOTS must contain at least one slot"
+
+  printf 'Waiting up to %ss for time selections to become available...\n' \
+    "$TIME_SLOT_AVAILABILITY_TIMEOUT"
+  while (( SECONDS < deadline )); do
+    if find_element_once 'accessibility id' "$slot" >/dev/null 2>&1 || \
+       find_element_once 'xpath' "//*[starts-with(@content-desc,\"${slot},\")]" >/dev/null 2>&1; then
+      printf 'Time selections are available.\n'
+      return 0
+    fi
+
+    attempts=$((attempts + 1))
+    # When the countdown is replaced, the page can become taller. Periodically
+    # move to the new bottom so evening slots enter the visible hierarchy.
+    if (( attempts % 20 == 0 )); then
+      scroll_booking_to_bottom
+    fi
+    sleep 0.25
+  done
+
+  die "Time selections did not become available within ${TIME_SLOT_AVAILABILITY_TIMEOUT}s"
+}
+
 booking_target_date_label() {
   local emulator_date=""
   local -a adb_args=()
@@ -583,6 +610,10 @@ run_booking_flow() {
   fi
   [[ -n "$target_element" ]] || die "Could not find booking date '${target_label}' after scrolling the date strip"
 
+  scroll_booking_to_bottom
+  wait_for_time_slot_availability
+  # The slot grid replaces the countdown and can extend the page, so establish
+  # the final bottom position immediately before the fast selection loop.
   scroll_booking_to_bottom
 
   local slot slot_element
