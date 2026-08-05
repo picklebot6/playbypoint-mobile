@@ -106,6 +106,7 @@ Options:
 
 Credentials are loaded from scripts/playbypoint-credentials.local.sh. Set
 PLAYBYPOINT_CREDENTIALS_FILE to use a different local shell configuration.
+Set ADDITIONAL_PLAYER_NAME in that file to add a player after court selection.
 USAGE
     exit 0
   }
@@ -120,6 +121,7 @@ USAGE
   [[ -n "${PLAYBYPOINT_PASSWORD:-}" && "$PLAYBYPOINT_PASSWORD" != 'replace-with-your-password' ]] || \
     die "Set PLAYBYPOINT_PASSWORD in ${CREDENTIALS_FILE}"
   export PLAYBYPOINT_EMAIL PLAYBYPOINT_PASSWORD
+  export ADDITIONAL_PLAYER_NAME="${ADDITIONAL_PLAYER_NAME:-}"
 
   local sdk_path adb_path emulator_path serial avd_name emulator_log emulator_pid package_path
   sdk_path="$(find_android_sdk || true)"

@@ -48,6 +48,7 @@ readonly BOOKING_TIMEOUT="${BOOKING_TIMEOUT:-20}"
 readonly RUN_BOOKING_FLOW="${RUN_BOOKING_FLOW:-1}"
 readonly APPIUM_START_TIMEOUT="${APPIUM_START_TIMEOUT:-60}"
 readonly TIME_SLOT_AVAILABILITY_TIMEOUT="${TIME_SLOT_AVAILABILITY_TIMEOUT:-180}"
+readonly ADDITIONAL_PLAYER_NAME="${ADDITIONAL_PLAYER_NAME:-}"
 
 # Editable consecutive booking slots. Keep the labels exactly as displayed by
 # Playbypoint; the booking flow selects each entry in this order.
@@ -79,6 +80,9 @@ Usage:
 Required:
   PLAYBYPOINT_EMAIL       Playbypoint account email
   PLAYBYPOINT_PASSWORD    Playbypoint account password
+
+Optional booking configuration:
+  ADDITIONAL_PLAYER_NAME  Exact player name to search for and add
 
 Common options:
   PLATFORM=android|ios    Mobile platform (default: android)
@@ -131,6 +135,20 @@ try:
 except (KeyError, TypeError, ValueError, json.JSONDecodeError):
     pass
 ' "$path"
+}
+
+xpath_literal() {
+  printf '%s' "$1" | "${PYTHON_CMD[@]}" -c '
+import sys
+value = sys.stdin.read()
+if "\x27" not in value:
+    print("\x27" + value + "\x27")
+elif "\x22" not in value:
+    print("\x22" + value + "\x22")
+else:
+    parts = value.split("\x27")
+    print("concat(" + ", \"\x27\", ".join("\x27" + part + "\x27" for part in parts) + ")")
+'
 }
 
 api() {
@@ -534,6 +552,46 @@ click_court_selection_next() {
   printf 'Advanced past court selection.\n'
 }
 
+add_additional_player() {
+  if [[ -z "$ADDITIONAL_PLAYER_NAME" ]]; then
+    printf 'No additional player is configured; skipping Add Players.\n'
+    return 0
+  fi
+
+  local player_name_xpath add_players_element find_players_element player_element add_element
+  player_name_xpath="$(xpath_literal "$ADDITIONAL_PLAYER_NAME")"
+
+  printf 'Opening Add Players...\n'
+  add_players_element="$(find_with_candidates "$BOOKING_TIMEOUT" 'Add Players button' \
+    'accessibility id' 'Add Players' \
+    'xpath' '//*[@text="Add Players" or @content-desc="Add Players"]')"
+  click_element "$add_players_element"
+
+  printf 'Searching for additional player: %s...\n' "$ADDITIONAL_PLAYER_NAME"
+  find_players_element="$(find_with_candidates "$BOOKING_TIMEOUT" 'Find players field' \
+    'accessibility id' 'Find players' \
+    'xpath' '//android.widget.EditText[@text="Find players" or @content-desc="Find players"]' \
+    'xpath' '//android.widget.EditText[contains(translate(@text,"FIND PLAYERS","find players"),"find players")]')"
+  type_into "$find_players_element" "$ADDITIONAL_PLAYER_NAME"
+
+  player_element="$(find_with_candidates "$BOOKING_TIMEOUT" 'matching additional player' \
+    'accessibility id' "$ADDITIONAL_PLAYER_NAME" \
+    'xpath' "//*[@text=${player_name_xpath} or @content-desc=${player_name_xpath}]" \
+    'xpath' "//*[contains(@text,${player_name_xpath}) or contains(@content-desc,${player_name_xpath})]")"
+  [[ -n "$player_element" ]] || die "Could not verify additional player '${ADDITIONAL_PLAYER_NAME}' in search results"
+
+  printf 'Adding player: %s...\n' "$ADDITIONAL_PLAYER_NAME"
+  add_element="$(find_with_candidates "$BOOKING_TIMEOUT" "Add button for ${ADDITIONAL_PLAYER_NAME}" \
+    'xpath' "//*[@text=${player_name_xpath} or @content-desc=${player_name_xpath}]/following::*[@text=\"Add\" or @content-desc=\"Add\"][1]" \
+    'xpath' "//*[contains(@text,${player_name_xpath}) or contains(@content-desc,${player_name_xpath})]/following::*[@text=\"Add\" or @content-desc=\"Add\"][1]" \
+    'xpath' "//*[contains(@content-desc,${player_name_xpath}) and (contains(@content-desc,\"Add\") or contains(@content-desc,\"ADD\"))]" \
+    'accessibility id' 'Add' \
+    'accessibility id' 'ADD' \
+    'xpath' '//*[@text="Add" or @text="ADD" or @content-desc="Add" or @content-desc="ADD"]')"
+  click_element "$add_element"
+  printf 'Added player: %s.\n' "$ADDITIONAL_PLAYER_NAME"
+}
+
 run_booking_flow() {
   [[ "$RUN_BOOKING_FLOW" == "1" ]] || {
     printf 'Booking navigation disabled (RUN_BOOKING_FLOW=%s).\n' "$RUN_BOOKING_FLOW"
@@ -650,6 +708,7 @@ run_booking_flow() {
   scroll_booking_details_into_view
   if select_preferred_court 1; then
     click_court_selection_next
+    add_additional_player
   else
     printf 'Court preference handling completed without a selection. No reservation was submitted.\n'
   fi
