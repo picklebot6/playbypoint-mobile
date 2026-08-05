@@ -121,7 +121,7 @@ USAGE
     die "Set PLAYBYPOINT_PASSWORD in ${CREDENTIALS_FILE}"
   export PLAYBYPOINT_EMAIL PLAYBYPOINT_PASSWORD
 
-  local sdk_path adb_path emulator_path serial avd_name emulator_log package_path
+  local sdk_path adb_path emulator_path serial avd_name emulator_log emulator_pid package_path
   sdk_path="$(find_android_sdk || true)"
   adb_path="$(find_tool adb "$sdk_path")" || die "adb not found. Install Android SDK Platform-Tools."
   emulator_path="$(find_tool emulator "$sdk_path")" || die "Android emulator not found. Install it from Android Studio's SDK Manager."
@@ -146,17 +146,25 @@ USAGE
     fi
     [[ -n "$avd_name" ]] || die "No Android Virtual Device exists. Create one with a Play Store image in Android Studio's Device Manager."
 
-    emulator_log="${TMPDIR:-/tmp}/playbypoint-emulator.log"
+    mkdir -p "${PROJECT_DIR}/logs"
+    emulator_log="${PROJECT_DIR}/logs/playbypoint-emulator.log"
     printf 'Starting Android emulator %s (log: %s)...\n' "$avd_name" "$emulator_log"
     "$emulator_path" -avd "$avd_name" -no-boot-anim >"$emulator_log" 2>&1 &
+    emulator_pid=$!
+    "$adb_path" start-server >/dev/null 2>&1 || true
 
-    local deadline=$((SECONDS + 30))
+    local deadline=$((SECONDS + BOOT_TIMEOUT))
     while (( SECONDS < deadline )); do
       serial="$($adb_path devices | awk '$1 ~ /^emulator-/ {print $1; exit}')"
       [[ -n "$serial" ]] && break
+      if ! kill -0 "$emulator_pid" >/dev/null 2>&1; then
+        printf 'Android emulator exited before appearing in adb. Recent log output:\n' >&2
+        tail -n 30 "$emulator_log" >&2 || true
+        die "Android emulator process terminated; inspect ${emulator_log}"
+      fi
       sleep 1
     done
-    [[ -n "$serial" ]] || die "Emulator did not appear in adb; inspect ${emulator_log}"
+    [[ -n "$serial" ]] || die "Emulator did not appear in adb within ${BOOT_TIMEOUT}s; inspect ${emulator_log}"
   fi
 
   wait_for_boot "$adb_path" "$serial" || die "Emulator did not finish booting within ${BOOT_TIMEOUT}s"
