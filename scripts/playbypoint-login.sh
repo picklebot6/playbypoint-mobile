@@ -389,6 +389,33 @@ scroll_booking_details_into_view() {
   sleep 0.5
 }
 
+scroll_booking_to_bottom() {
+  local rect_response screen_width screen_height left top width height response can_scroll_more attempt
+  rect_response="$(api GET "/session/${SESSION_ID}/window/rect")"
+  screen_width="$(printf '%s' "$rect_response" | json_value 'value.width')"
+  screen_height="$(printf '%s' "$rect_response" | json_value 'value.height')"
+  [[ "$screen_width" =~ ^[0-9]+$ && "$screen_height" =~ ^[0-9]+$ ]] || \
+    die "Could not determine the Android window size before scrolling"
+
+  left=$((screen_width / 20))
+  top=$((screen_height / 4))
+  width=$((screen_width * 9 / 10))
+  height=$((screen_height * 3 / 5))
+
+  printf 'Scrolling booking availability all the way to the bottom...\n'
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    response="$(api POST "/session/${SESSION_ID}/execute/sync" \
+      "{\"script\":\"mobile: scrollGesture\",\"args\":[{\"left\":${left},\"top\":${top},\"width\":${width},\"height\":${height},\"direction\":\"down\",\"percent\":1.0}]}")"
+    can_scroll_more="$(printf '%s' "$response" | json_value 'value')"
+    if [[ "$can_scroll_more" == "false" ]]; then
+      break
+    fi
+    [[ "$can_scroll_more" == "true" ]] || die "Could not scroll booking availability: ${response}"
+  done
+  [[ "$can_scroll_more" != "true" ]] || die "Booking availability was still scrollable after 10 downward gestures"
+  printf 'Reached the bottom of booking availability.\n'
+}
+
 booking_target_date_label() {
   local emulator_date=""
   local -a adb_args=()
@@ -555,6 +582,8 @@ run_booking_flow() {
     done
   fi
   [[ -n "$target_element" ]] || die "Could not find booking date '${target_label}' after scrolling the date strip"
+
+  scroll_booking_to_bottom
 
   local slot slot_element
   local selected_slot_count=0
