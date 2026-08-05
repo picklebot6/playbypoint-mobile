@@ -1,0 +1,13 @@
+.appium/
+.npm-cache/
+node_modules/
+.redroid-data/
+.playbypoint-oracle-a1.lock
+logs/
+scripts/playbypoint-credentials.local.sh
+.DS_Store
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
