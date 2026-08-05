@@ -48,15 +48,15 @@ readonly BOOKING_TIMEOUT="${BOOKING_TIMEOUT:-20}"
 readonly RUN_BOOKING_FLOW="${RUN_BOOKING_FLOW:-1}"
 readonly APPIUM_START_TIMEOUT="${APPIUM_START_TIMEOUT:-60}"
 readonly TIME_SLOT_AVAILABILITY_TIMEOUT="${TIME_SLOT_AVAILABILITY_TIMEOUT:-180}"
-readonly ADDITIONAL_PLAYER_NAME="${ADDITIONAL_PLAYER_NAME:-}"
+readonly ADDITIONAL_PLAYER_NAME="${ADDITIONAL_PLAYER_NAME:-Paul Rodriguez}"
 
 # Editable consecutive booking slots. Keep the labels exactly as displayed by
 # Playbypoint; the booking flow selects each entry in this order.
 BOOKING_TIME_SLOTS=(
-  '6-6:30pm'
-  '6:30-7pm'
-  '7-7:30pm'
-  '7:30-8pm'
+  '2-2:30pm'
+  '2:30-3pm'
+  '3-3:30pm'
+  '3:30-4pm'
 )
 
 # Editable court preference, from highest to lowest priority. The first court
