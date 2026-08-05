@@ -46,6 +46,7 @@ readonly LOGIN_PROMPT_TIMEOUT="${LOGIN_PROMPT_TIMEOUT:-12}"
 readonly NOTIFICATION_PROMPT_TIMEOUT="${NOTIFICATION_PROMPT_TIMEOUT:-3}"
 readonly BOOKING_TIMEOUT="${BOOKING_TIMEOUT:-20}"
 readonly RUN_BOOKING_FLOW="${RUN_BOOKING_FLOW:-1}"
+readonly APPIUM_START_TIMEOUT="${APPIUM_START_TIMEOUT:-60}"
 
 # Editable consecutive booking slots. Keep the labels exactly as displayed by
 # Playbypoint; the booking flow selects each entry in this order.
@@ -61,7 +62,7 @@ BOOKING_TIME_SLOTS=(
 COURT_PRIORITY=(4 3 8 9 2 6 1 5 10 7)
 readonly KEEP_SESSION="${KEEP_SESSION:-0}"
 readonly START_APPIUM="${START_APPIUM:-1}"
-readonly APPIUM_LOG="${APPIUM_LOG:-${TMPDIR:-/tmp}/playbypoint-appium.log}"
+readonly APPIUM_LOG="${APPIUM_LOG:-${PROJECT_DIR}/logs/playbypoint-appium.log}"
 
 SESSION_ID=""
 APPIUM_PID=""
@@ -145,7 +146,7 @@ api() {
 }
 
 server_is_ready() {
-  curl -fsS "${APPIUM_SERVER_URL}/status" >/dev/null 2>&1
+  curl -fsS --connect-timeout 1 --max-time 2 "${APPIUM_SERVER_URL}/status" >/dev/null 2>&1
 }
 
 cleanup() {
@@ -623,14 +624,28 @@ main() {
   if ! server_is_ready; then
     [[ "$START_APPIUM" == "1" ]] || die "Appium is not reachable at ${APPIUM_SERVER_URL}"
     command_exists appium || die "Appium is not running and the 'appium' command is unavailable"
+    mkdir -p "$(dirname "$APPIUM_LOG")"
     printf 'Starting Appium (log: %s)...\n' "$APPIUM_LOG"
     appium >"$APPIUM_LOG" 2>&1 &
     APPIUM_PID=$!
-    for _ in {1..30}; do
-      server_is_ready && break
+    local appium_deadline=$((SECONDS + APPIUM_START_TIMEOUT))
+    while (( SECONDS < appium_deadline )); do
+      if server_is_ready; then
+        break
+      fi
+      if ! kill -0 "$APPIUM_PID" >/dev/null 2>&1; then
+        printf 'Appium exited during startup. Recent log output:\n' >&2
+        tail -n 40 "$APPIUM_LOG" >&2 || true
+        die "Appium process terminated; inspect ${APPIUM_LOG}"
+      fi
       sleep 1
     done
-    server_is_ready || die "Appium did not become ready; inspect ${APPIUM_LOG}"
+    if ! server_is_ready; then
+      printf 'Appium did not become ready. Recent log output:\n' >&2
+      tail -n 40 "$APPIUM_LOG" >&2 || true
+      die "Appium did not become ready within ${APPIUM_START_TIMEOUT}s; inspect ${APPIUM_LOG}"
+    fi
+    printf 'Appium is ready.\n'
   fi
 
   local automation app_id platform_name platform_capabilities udid_capabilities session_payload response
