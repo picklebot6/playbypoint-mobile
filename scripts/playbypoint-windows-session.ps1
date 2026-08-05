@@ -30,14 +30,31 @@ if (-not (Test-Path (Join-Path $AndroidSdk 'emulator\emulator.exe'))) {
     throw "emulator.exe was not found under $AndroidSdk"
 }
 
+$PythonExe = $null
+$pyLauncher = Get-Command py.exe -ErrorAction SilentlyContinue
+if ($null -ne $pyLauncher) {
+    $PythonExe = (& $pyLauncher.Source -3 -c 'import sys; print(sys.executable)' | Select-Object -Last 1).Trim()
+}
+if ([string]::IsNullOrWhiteSpace($PythonExe) -or -not (Test-Path $PythonExe)) {
+    $pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
+    if ($null -ne $pythonCommand) {
+        $PythonExe = (& $pythonCommand.Source -c 'import sys; print(sys.executable)' | Select-Object -Last 1).Trim()
+    }
+}
+if ([string]::IsNullOrWhiteSpace($PythonExe) -or -not (Test-Path $PythonExe)) {
+    throw 'Python 3 could not be resolved from PowerShell. Install Python 3 with the Python Launcher and PATH options enabled.'
+}
+
 $bashProject = Convert-ToBashPath $ProjectDir
 $bashSdk = Convert-ToBashPath $AndroidSdk
 $bashAvdHome = Convert-ToBashPath $AndroidAvdHome
+$bashPython = Convert-ToBashPath $PythonExe
 
 $bashCommand = @"
 export ANDROID_SDK_ROOT='$bashSdk'
 export ANDROID_HOME='$bashSdk'
 export ANDROID_AVD_HOME='$bashAvdHome'
+export PLAYBYPOINT_PYTHON='$bashPython'
 cd '$bashProject'
 AVD_NAME='$AvdName' ./scripts/playbypoint-local-session.sh
 "@

@@ -598,7 +598,9 @@ main() {
   [[ "${1:-}" != "-h" && "${1:-}" != "--help" ]] || { usage; exit 0; }
   [[ $# -eq 0 ]] || { usage >&2; die "Unexpected arguments"; }
   command_exists curl || die "curl is required"
-  if command_exists python3; then
+  if [[ -n "${PLAYBYPOINT_PYTHON:-}" && -x "${PLAYBYPOINT_PYTHON}" ]]; then
+    PYTHON_CMD=("${PLAYBYPOINT_PYTHON}")
+  elif command_exists python3; then
     PYTHON_CMD=(python3)
   elif command_exists python; then
     PYTHON_CMD=(python)
