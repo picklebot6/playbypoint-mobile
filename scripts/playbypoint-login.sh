@@ -561,10 +561,15 @@ add_additional_player() {
   local player_name_xpath add_players_element find_players_element player_element add_element
   player_name_xpath="$(xpath_literal "$ADDITIONAL_PLAYER_NAME")"
 
-  printf 'Opening Add Players...\n'
-  add_players_element="$(find_with_candidates "$BOOKING_TIMEOUT" 'Add Players button' \
+  printf 'Opening Add Player...\n'
+  add_players_element="$(find_with_candidates "$BOOKING_TIMEOUT" 'Add Player button' \
     'accessibility id' 'Add Players' \
-    'xpath' '//*[@text="Add Players" or @content-desc="Add Players"]')"
+    'accessibility id' 'Add players' \
+    'accessibility id' 'ADD PLAYERS' \
+    'accessibility id' 'Add Player' \
+    'accessibility id' 'Add player' \
+    'accessibility id' 'ADD PLAYER' \
+    'xpath' '//*[(translate(@text,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="add player" or translate(@text,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="add players") or (translate(@content-desc,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="add player" or translate(@content-desc,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="add players")]')"
   click_element "$add_players_element"
 
   printf 'Searching for additional player: %s...\n' "$ADDITIONAL_PLAYER_NAME"
