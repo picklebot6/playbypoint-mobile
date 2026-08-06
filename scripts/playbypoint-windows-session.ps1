@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 # Edit these three values for the Windows PC.
 $AndroidSdk = 'D:\AndroidSDK'
 $AndroidAvdHome = 'D:\Android\AVD'
-$AvdName = 'PlayByPoint_API_35'
+$AvdName = 'PlayByPoint'
 
 $ProjectDir = Split-Path -Parent $PSScriptRoot
 $GitBash = 'C:\Program Files\Git\bin\bash.exe'
