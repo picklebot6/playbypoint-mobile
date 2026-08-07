@@ -12,6 +12,7 @@ readonly LOGIN_SCRIPT="${SCRIPT_DIR}/playbypoint-login.sh"
 readonly CREDENTIALS_FILE="${PLAYBYPOINT_CREDENTIALS_FILE:-${SCRIPT_DIR}/playbypoint-credentials.local.sh}"
 readonly TARGET_ANDROID_PACKAGE="${ANDROID_PACKAGE:-com.playbypoint.appx}"
 readonly BOOT_TIMEOUT="${BOOT_TIMEOUT:-180}"
+readonly HEADLESS="${HEADLESS:-1}"
 
 export APPIUM_HOME="${APPIUM_HOME:-${PROJECT_DIR}/.appium}"
 export npm_config_cache="${npm_config_cache:-${PROJECT_DIR}/.npm-cache}"
@@ -103,6 +104,7 @@ Options:
   AVD_NAME=<name>       Android Virtual Device to start; defaults to the first
   BOOT_TIMEOUT=<secs>   Emulator boot timeout (default: 180)
   UDID=<serial>         Reuse a specific running emulator
+  HEADLESS=0|1          Start a new emulator with no window/audio (default: 0)
 
 Credentials are loaded from scripts/playbypoint-credentials.local.sh. Set
 PLAYBYPOINT_CREDENTIALS_FILE to use a different local shell configuration.
@@ -111,6 +113,7 @@ USAGE
     exit 0
   }
   [[ $# -eq 0 ]] || die "Unexpected arguments; use --help"
+  [[ "$HEADLESS" == "0" || "$HEADLESS" == "1" ]] || die "HEADLESS must be 0 or 1"
   [[ -x "$LOGIN_SCRIPT" ]] || die "Login script is missing or not executable: ${LOGIN_SCRIPT}"
   [[ -f "$CREDENTIALS_FILE" ]] || die "Credentials file not found: ${CREDENTIALS_FILE}"
 
@@ -124,6 +127,7 @@ USAGE
   export ADDITIONAL_PLAYER_NAME="${ADDITIONAL_PLAYER_NAME:-}"
 
   local sdk_path adb_path emulator_path serial avd_name emulator_log emulator_pid package_path
+  local -a emulator_args
   sdk_path="$(find_android_sdk || true)"
   adb_path="$(find_tool adb "$sdk_path")" || die "adb not found. Install Android SDK Platform-Tools."
   emulator_path="$(find_tool emulator "$sdk_path")" || die "Android emulator not found. Install it from Android Studio's SDK Manager."
@@ -150,8 +154,14 @@ USAGE
 
     mkdir -p "${PROJECT_DIR}/logs"
     emulator_log="${PROJECT_DIR}/logs/playbypoint-emulator.log"
-    printf 'Starting Android emulator %s (log: %s)...\n' "$avd_name" "$emulator_log"
-    "$emulator_path" -avd "$avd_name" -no-boot-anim >"$emulator_log" 2>&1 &
+    emulator_args=(-avd "$avd_name" -no-boot-anim)
+    if [[ "$HEADLESS" == "1" ]]; then
+      emulator_args+=(-no-window -no-audio)
+      printf 'Starting Android emulator %s in headless mode (log: %s)...\n' "$avd_name" "$emulator_log"
+    else
+      printf 'Starting Android emulator %s with a visible window (log: %s)...\n' "$avd_name" "$emulator_log"
+    fi
+    "$emulator_path" "${emulator_args[@]}" >"$emulator_log" 2>&1 &
     emulator_pid=$!
     "$adb_path" start-server >/dev/null 2>&1 || true
 
@@ -167,6 +177,8 @@ USAGE
       sleep 1
     done
     [[ -n "$serial" ]] || die "Emulator did not appear in adb within ${BOOT_TIMEOUT}s; inspect ${emulator_log}"
+  elif [[ "$HEADLESS" == "1" ]]; then
+    printf 'Reusing existing emulator %s; HEADLESS only applies when starting a new emulator.\n' "$serial"
   fi
 
   wait_for_boot "$adb_path" "$serial" || die "Emulator did not finish booting within ${BOOT_TIMEOUT}s"

@@ -2,8 +2,11 @@ $ErrorActionPreference = 'Stop'
 
 # Edit these three values for the Windows PC.
 $AndroidSdk = 'D:\AndroidSDK'
-$AndroidAvdHome = 'D:\Android\AVD'
+$AndroidAvdHome = 'C:\Android\AVD'
 $AvdName = 'PlayByPoint'
+# Switch to $true for unattended runs with no emulator window.
+# Switch to $false when you want to watch and interact with the emulator.
+$Headless = $true
 
 $ProjectDir = Split-Path -Parent $PSScriptRoot
 $GitBash = 'C:\Program Files\Git\bin\bash.exe'
@@ -49,6 +52,7 @@ $bashProject = Convert-ToBashPath $ProjectDir
 $bashSdk = Convert-ToBashPath $AndroidSdk
 $bashAvdHome = Convert-ToBashPath $AndroidAvdHome
 $bashPython = Convert-ToBashPath $PythonExe
+$headlessValue = if ($Headless) { '1' } else { '0' }
 
 $bashCommand = @"
 export ANDROID_SDK_ROOT='$bashSdk'
@@ -56,7 +60,7 @@ export ANDROID_HOME='$bashSdk'
 export ANDROID_AVD_HOME='$bashAvdHome'
 export PLAYBYPOINT_PYTHON='$bashPython'
 cd '$bashProject'
-AVD_NAME='$AvdName' ./scripts/playbypoint-local-session.sh
+HEADLESS='$headlessValue' AVD_NAME='$AvdName' ./scripts/playbypoint-local-session.sh
 "@
 
 & $GitBash -lc $bashCommand
