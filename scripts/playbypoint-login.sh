@@ -47,8 +47,8 @@ readonly NOTIFICATION_PROMPT_TIMEOUT="${NOTIFICATION_PROMPT_TIMEOUT:-3}"
 readonly BOOKING_TIMEOUT="${BOOKING_TIMEOUT:-20}"
 readonly RUN_BOOKING_FLOW="${RUN_BOOKING_FLOW:-1}"
 readonly APPIUM_START_TIMEOUT="${APPIUM_START_TIMEOUT:-180}"
-readonly TIME_SLOT_AVAILABILITY_TIMEOUT="${TIME_SLOT_AVAILABILITY_TIMEOUT:-300}"
-readonly ADDITIONAL_PLAYER_NAME="${ADDITIONAL_PLAYER_NAME:-Paul Rodriguez}"
+readonly TIME_SLOT_AVAILABILITY_TIMEOUT="${TIME_SLOT_AVAILABILITY_TIMEOUT:-500}"
+readonly ADDITIONAL_PLAYER_NAME="${ADDITIONAL_PLAYER_NAME:-philip pham}"
 readonly ELEMENT_POLL_INTERVAL="${ELEMENT_POLL_INTERVAL:-0.1}"
 readonly TIME_SLOT_POLL_INTERVAL="${TIME_SLOT_POLL_INTERVAL:-0.05}"
 readonly CONFIRMATION_TIMEOUT="${CONFIRMATION_TIMEOUT:-30}"
@@ -58,14 +58,14 @@ readonly BOOKING_FAILURE_FILE="${BOOKING_FAILURE_FILE:-${PROJECT_DIR}/logs/playb
 # Editable consecutive booking slots. Keep the labels exactly as displayed by
 # Playbypoint; the booking flow selects each entry in this order.
 BOOKING_TIME_SLOTS=(
-  '2:30-3pm'
-  '3-3:30pm'
-  '3:30-4pm'
-  '4-4:30pm'
-  # '7:30-8pm'
-  # '8-8:30pm'
-  # '8:30-9pm'
-  # '9-9:30pm'
+  # '2:30-3pm'
+  # '3-3:30pm'
+  # '3:30-4pm'
+  # '4-4:30pm'
+  '8-8:30pm'
+  '8:30-9pm'
+  '9-9:30pm'
+  '9:30-10pm'
 )
 
 # Editable court preference, from highest to lowest priority. The first court
@@ -496,11 +496,21 @@ wait_for_time_slot_availability() {
 }
 
 plan_time_slot_selection() {
-  local source_response hierarchy
+  local source_response hierarchy screenshot_file=""
+  local -a adb_args=()
   source_response="$(api GET "/session/${SESSION_ID}/source" 2>/dev/null || true)"
   hierarchy="$(printf '%s' "$source_response" | json_value 'value')"
+  if [[ "$PLATFORM" == "android" ]] && command_exists adb; then
+    [[ -n "${UDID:-}" ]] && adb_args=(-s "$UDID")
+    screenshot_file="$(mktemp "${TMPDIR:-/tmp}/playbypoint-slots.XXXXXX")"
+    adb "${adb_args[@]}" exec-out screencap >"$screenshot_file" 2>/dev/null || {
+      rm -f "$screenshot_file"
+      screenshot_file=""
+    }
+  fi
   printf '%s' "$hierarchy" | "${PYTHON_CMD[@]}" -c '
 import re
+import struct
 import sys
 import xml.etree.ElementTree as ET
 
@@ -514,13 +524,48 @@ except ET.ParseError:
     raise SystemExit
 
 nodes = list(root.iter())
-for index, slot in enumerate(sys.argv[1:]):
+screenshot_path = sys.argv[1]
+slot_labels = sys.argv[2:]
+raw_pixels = None
+screen_width = screen_height = pixel_offset = 0
+if screenshot_path:
+    try:
+        raw = open(screenshot_path, "rb").read()
+        screen_width, screen_height, pixel_format = struct.unpack("<III", raw[:12])
+        payload_size = screen_width * screen_height * 4
+        candidate_offset = len(raw) - payload_size
+        if pixel_format == 1 and candidate_offset in (12, 16):
+            raw_pixels = raw
+            pixel_offset = candidate_offset
+    except (OSError, struct.error):
+        pass
+
+def slot_is_red(node):
+    if raw_pixels is None:
+        return None
+    match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.attrib.get("bounds", ""))
+    if match is None:
+        return None
+    x1, y1, x2, y2 = map(int, match.groups())
+    red_pixels = 0
+    for y in range(max(0, y1), min(screen_height, y2)):
+        row = pixel_offset + y * screen_width * 4
+        for x in range(max(0, x1), min(screen_width, x2)):
+            offset = row + x * 4
+            red, green, blue = raw_pixels[offset:offset + 3]
+            if red > 210 and red - green > 50 and red - blue > 35:
+                red_pixels += 1
+                if red_pixels >= 40:
+                    return True
+    return False
+
+for index, slot in enumerate(slot_labels):
     available = next((node for node in nodes if
         node.attrib.get("content-desc") == slot or node.attrib.get("text") == slot), None)
     booked = next((node for node in nodes if
         node.attrib.get("content-desc", "").startswith(slot + ",") or
         node.attrib.get("text", "").startswith(slot + ",")), None)
-    node = available if available is not None else booked
+    node = booked if booked is not None else available
     if node is None:
         print(f"missing\t{slot}\t\t")
         if index == 0:
@@ -533,11 +578,11 @@ for index, slot in enumerate(sys.argv[1:]):
             continue
         break
     x1, y1, x2, y2 = map(int, match.groups())
-    status = "available" if available is not None else "booked"
+    status_by_color = slot_is_red(node)
+    status = "booked" if status_by_color is True or (status_by_color is None and booked is not None) else "available"
     print(f"{status}\t{slot}\t{(x1 + x2) // 2}\t{(y1 + y2) // 2}")
-    if status == "booked" and index != 0:
-        break
-' "${BOOKING_TIME_SLOTS[@]}"
+' "$screenshot_file" "${BOOKING_TIME_SLOTS[@]}"
+  rm -f "$screenshot_file"
 }
 
 expected_time_range_from_slots() {
@@ -843,11 +888,22 @@ click_visible_court_and_confirm() {
   printf 'Selected court %s.\n' "$court"
 }
 
+click_court_coordinates_and_confirm() {
+  local court="$1" x="$2" y="$3" response error_message
+  response="$(api POST "/session/${SESSION_ID}/execute/sync" \
+    "{\"script\":\"mobile: clickGesture\",\"args\":[{\"x\":${x},\"y\":${y}}]}")"
+  error_message="$(printf '%s' "$response" | json_value 'value.message')"
+  [[ -z "$error_message" ]] || die "Could not click court ${court} at (${x},${y}): ${error_message}"
+  wait_for_selected_court "$court" || \
+    die "Court ${court} was clicked, but the selected-court summary did not update"
+  printf 'Selected court %s.\n' "$court"
+}
+
 select_preferred_court() {
   local announce_unavailable="${1:-1}"
   local court_index court selected_court desired_court desired_index
   local snapshot next_snapshot entries entry visible_court seen_courts="" chosen_court="" chosen_index=-1 attempt
-  local carousel_element can_scroll_more
+  local carousel_element can_scroll_more desired_x="" snapshot_y reached_end=0 available_count=0 chosen_x=""
   local -a visible_entries=()
   selected_court="$(current_selected_court)"
   if [[ -n "$selected_court" && "$announce_unavailable" == "1" ]]; then
@@ -862,49 +918,76 @@ select_preferred_court() {
     printf 'Highest-priority court %s is already selected; no carousel scan is needed.\n' "$desired_court"
     return 0
   fi
-
-  printf 'Rapidly searching the court carousel for highest-priority court %s...\n' "$desired_court"
-  reset_court_strip_to_beginning
-  CURRENT_BOOKING_COURT_INDEX="$desired_index"
-  CURRENT_BOOKING_COURT="$desired_court"
-  if click_visible_court_and_confirm "$desired_court"; then
-    return 0
-  fi
-
-  carousel_element="$(find_court_carousel_element)" || die "Could not find the horizontal court carousel"
-  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
-    can_scroll_more="$(scroll_court_carousel_element "$carousel_element" left)"
-    if click_visible_court_and_confirm "$desired_court"; then
-      printf 'Court %s was clicked immediately when it became visible.\n' "$desired_court"
-      return 0
-    fi
-    [[ "$can_scroll_more" == "false" ]] && break
-  done
-
-  printf 'Court %s was not present; scanning once for the best lower-priority court.\n' "$desired_court"
-  reset_court_strip_to_beginning
+  # When the hierarchy exposes at most two courts, they already fit on screen.
+  # Choose directly from that complete visible set without resetting or swiping.
   snapshot="$(court_strip_snapshot)"
-  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-    [[ -n "$snapshot" ]] || die "Lost the court carousel while scanning it"
+  if [[ -n "$snapshot" ]]; then
+    snapshot_y="${snapshot%%$'\t'*}"
     entries="${snapshot#*$'\t'}"
     IFS=',' read -r -a visible_entries <<< "$entries"
     for entry in "${visible_entries[@]}"; do
       visible_court="${entry%%:*}"
+      [[ "$visible_court" =~ ^[0-9]+$ ]] && available_count=$((available_count + 1))
+    done
+    if (( available_count > 0 && available_count <= 2 )); then
+      for ((court_index = COURT_PRIORITY_START_INDEX; court_index < ${#COURT_PRIORITY[@]}; court_index++)); do
+        court="${COURT_PRIORITY[court_index]}"
+        for entry in "${visible_entries[@]}"; do
+          if [[ "${entry%%:*}" == "$court" ]]; then
+            chosen_court="$court"
+            chosen_index="$court_index"
+            chosen_x="${entry#*:}"
+            break 2
+          fi
+        done
+      done
+      [[ -n "$chosen_court" ]] || return 1
+      CURRENT_BOOKING_COURT_INDEX="$chosen_index"
+      CURRENT_BOOKING_COURT="$chosen_court"
+      if [[ "$chosen_court" == "$selected_court" ]]; then
+        printf 'Highest-priority court %s is already selected; only %s court(s) are available, so no carousel scan is needed.\n' \
+          "$chosen_court" "$available_count"
+        return 0
+      fi
+      printf 'Only %s court(s) are available; selecting priority court %s immediately without carousel scanning.\n' \
+        "$available_count" "$chosen_court"
+      click_court_coordinates_and_confirm "$chosen_court" "$chosen_x" "$snapshot_y"
+      return 0
+    fi
+  fi
+
+
+  CURRENT_BOOKING_COURT_INDEX="$desired_index"
+  CURRENT_BOOKING_COURT="$desired_court"
+  printf 'Rapidly scanning once for highest-priority court %s and all fallback courts...\n' "$desired_court"
+  reset_court_strip_to_beginning
+  carousel_element="$(find_court_carousel_element)" || die "Could not find the horizontal court carousel"
+  snapshot="$(court_strip_snapshot)"
+  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    [[ -n "$snapshot" ]] || die "Lost the court carousel while scanning it"
+    desired_x=""
+    snapshot_y="${snapshot%%$'\t'*}"
+    entries="${snapshot#*$'\t'}"
+    IFS=',' read -r -a visible_entries <<< "$entries"
+    for entry in "${visible_entries[@]}"; do
+      visible_court="${entry%%:*}"
+      [[ "$visible_court" == "$desired_court" ]] && desired_x="${entry#*:}"
       if [[ "$visible_court" =~ ^[0-9]+$ && $'\n'"$seen_courts"$'\n' != *$'\n'"$visible_court"$'\n'* ]]; then
         seen_courts+="${visible_court}"$'\n'
       fi
     done
 
-    if [[ $'\n'"$seen_courts"$'\n' == *$'\n'"$desired_court"$'\n'* ]]; then
+    if [[ "$desired_x" =~ ^[0-9]+$ && "$snapshot_y" =~ ^[0-9]+$ ]]; then
       CURRENT_BOOKING_COURT_INDEX="$desired_index"
       CURRENT_BOOKING_COURT="$desired_court"
-      printf 'Court %s became visible; clicking it immediately.\n' "$desired_court"
-      click_visible_court_and_confirm "$desired_court" || \
-        die "Court ${desired_court} became visible but its clickable element could not be found"
+      printf 'Court %s became visible; clicking its coordinates immediately.\n' "$desired_court"
+      click_court_coordinates_and_confirm "$desired_court" "$desired_x" "$snapshot_y"
       return 0
     fi
 
-    swipe_court_strip left "$snapshot"
+    (( reached_end == 1 )) && break
+    can_scroll_more="$(scroll_court_carousel_element "$carousel_element" left)"
+    [[ "$can_scroll_more" == "false" ]] && reached_end=1
     next_snapshot="$(court_strip_snapshot)"
     [[ "$next_snapshot" == "$snapshot" ]] && break
     snapshot="$next_snapshot"
@@ -973,6 +1056,25 @@ record_booking_failure_popup() {
   printf 'Saved booking popup text to %s\n' "$BOOKING_FAILURE_FILE"
 }
 
+is_ignorable_system_notification() {
+  local normalized
+  normalized="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  [[ "$normalized" == *"security & privacy notification"* || \
+     "$normalized" == *"set a screen lock"* ]]
+}
+
+dismiss_ignorable_system_notification() {
+  local notification_text="$1"
+  local -a adb_args=()
+
+  printf 'Ignoring Android system notification during booking confirmation: %s\n' "$notification_text"
+  api POST "/session/${SESSION_ID}/alert/dismiss" '{}' >/dev/null 2>&1 || true
+  if [[ "$PLATFORM" == "android" ]] && command_exists adb; then
+    [[ -n "${UDID:-}" ]] && adb_args=(-s "$UDID")
+    adb "${adb_args[@]}" shell cmd statusbar collapse >/dev/null 2>&1 || true
+  fi
+}
+
 handle_booking_failure_popup() {
   local hierarchy="$1"
   local alert_response alert_text ok_element popup_text
@@ -989,6 +1091,10 @@ if isinstance(value, str):
     print(value)
 ')"
   if [[ -n "$alert_text" ]]; then
+    if is_ignorable_system_notification "$alert_text"; then
+      dismiss_ignorable_system_notification "$alert_text"
+      return 1
+    fi
     record_booking_failure_popup "$alert_text"
     if ! api POST "/session/${SESSION_ID}/alert/accept" '{}' >/dev/null 2>&1; then
       ok_element="$(find_with_candidates "$BOOKING_TIMEOUT" 'booking popup OK button' \
@@ -1022,11 +1128,16 @@ nodes = list(root.iter())
 parents = {child: parent for parent in nodes for child in parent}
 values = []
 preferred = []
+
+def ignored_system_notification(value):
+    normalized = value.lower()
+    return "security & privacy notification" in normalized or "set a screen lock" in normalized
+
 for node in nodes:
     resource_id = node.attrib.get("resource-id", "").lower()
     for attribute in ("text", "content-desc"):
         value = node.attrib.get(attribute, "").strip()
-        if not value or value.upper() in {"OK", "BACK", "BOOK", "NEXT"}:
+        if not value or value.upper() in {"OK", "BACK", "BOOK", "NEXT"} or ignored_system_notification(value):
             continue
         if value not in values:
             values.append(value)
@@ -1039,7 +1150,7 @@ def meaningful_values(node):
     for descendant in node.iter():
         for attribute in ("text", "content-desc"):
             value = descendant.attrib.get(attribute, "").strip()
-            if value and value.upper() not in {"OK", "BACK", "BOOK", "NEXT"} and len(value) >= 4 and value not in found:
+            if value and value.upper() not in {"OK", "BACK", "BOOK", "NEXT"} and not ignored_system_notification(value) and len(value) >= 4 and value not in found:
                 found.append(value)
     return found
 
@@ -1057,10 +1168,14 @@ for ok_node in nodes:
     if candidates:
         break
 
-candidates = preferred or candidates or [value for value in values if len(value) >= 12]
+candidates = candidates or preferred or [value for value in values if len(value) >= 12]
 if candidates:
     print(max(candidates, key=len))
 ')"
+    if is_ignorable_system_notification "$popup_text"; then
+      dismiss_ignorable_system_notification "$popup_text"
+      return 1
+    fi
     record_booking_failure_popup "$popup_text"
     click_element "$ok_element"
   fi
@@ -1178,8 +1293,10 @@ add_additional_player() {
     return $?
   fi
 
-  local player_name_xpath add_players_element find_players_element player_element add_element done_element
+  local player_name_xpath player_name_lower player_name_lower_xpath add_players_element find_players_element player_element add_element done_element
   player_name_xpath="$(xpath_literal "$ADDITIONAL_PLAYER_NAME")"
+  player_name_lower="$(printf '%s' "$ADDITIONAL_PLAYER_NAME" | tr '[:upper:]' '[:lower:]')"
+  player_name_lower_xpath="$(xpath_literal "$player_name_lower")"
 
   if find_element_once 'xpath' \
     "//*[@text=${player_name_xpath} or @content-desc=${player_name_xpath}]" >/dev/null 2>&1; then
@@ -1205,21 +1322,18 @@ add_additional_player() {
     'xpath' '//android.widget.EditText[@text="Find players" or @content-desc="Find players"]' \
     'xpath' '//android.widget.EditText[contains(translate(@text,"FIND PLAYERS","find players"),"find players")]')"
   type_into "$find_players_element" "$ADDITIONAL_PLAYER_NAME"
+  sleep 1
 
   player_element="$(find_with_candidates "$BOOKING_TIMEOUT" 'matching additional player' \
-    'accessibility id' "$ADDITIONAL_PLAYER_NAME" \
-    'xpath' "//*[@text=${player_name_xpath} or @content-desc=${player_name_xpath}]" \
-    'xpath' "//*[contains(@text,${player_name_xpath}) or contains(@content-desc,${player_name_xpath})]")"
+    'xpath' "//*[translate(normalize-space(@text),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=${player_name_lower_xpath} or translate(normalize-space(@content-desc),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=${player_name_lower_xpath}]" \
+    'xpath' "//*[@text=${player_name_xpath} or @content-desc=${player_name_xpath}]")"
   [[ -n "$player_element" ]] || die "Could not verify additional player '${ADDITIONAL_PLAYER_NAME}' in search results"
 
   printf 'Adding player: %s...\n' "$ADDITIONAL_PLAYER_NAME"
-  add_element="$(find_with_candidates "$BOOKING_TIMEOUT" "Add button for ${ADDITIONAL_PLAYER_NAME}" \
-    'xpath' "//*[@text=${player_name_xpath} or @content-desc=${player_name_xpath}]/following::*[@text=\"Add\" or @content-desc=\"Add\"][1]" \
-    'xpath' "//*[contains(@text,${player_name_xpath}) or contains(@content-desc,${player_name_xpath})]/following::*[@text=\"Add\" or @content-desc=\"Add\"][1]" \
-    'xpath' "//*[contains(@content-desc,${player_name_xpath}) and (contains(@content-desc,\"Add\") or contains(@content-desc,\"ADD\"))]" \
-    'accessibility id' 'Add' \
-    'accessibility id' 'ADD' \
-    'xpath' '//*[@text="Add" or @text="ADD" or @content-desc="Add" or @content-desc="ADD"]')"
+  add_element="$(find_with_candidates "$BOOKING_TIMEOUT" "Add button in result row for ${ADDITIONAL_PLAYER_NAME}" \
+    'xpath' "(//*[translate(normalize-space(@text),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=${player_name_lower_xpath} or translate(normalize-space(@content-desc),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=${player_name_lower_xpath}]/ancestor::*[.//*[translate(normalize-space(@text),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=\"add\" or translate(normalize-space(@content-desc),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=\"add\"]][1]//*[translate(normalize-space(@text),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=\"add\" or translate(normalize-space(@content-desc),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=\"add\"])[1]" \
+    'xpath' "(//*[translate(normalize-space(@text),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=${player_name_lower_xpath} or translate(normalize-space(@content-desc),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=${player_name_lower_xpath}][.//*[translate(normalize-space(@text),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=\"add\" or translate(normalize-space(@content-desc),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=\"add\"]]//*[translate(normalize-space(@text),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=\"add\" or translate(normalize-space(@content-desc),\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\",\"abcdefghijklmnopqrstuvwxyz\")=\"add\"])[1]")"
+  [[ -n "$add_element" ]] || die "Could not find the Add button in the result row for '${ADDITIONAL_PLAYER_NAME}'"
   click_element "$add_element"
   printf 'Added player: %s.\n' "$ADDITIONAL_PLAYER_NAME"
 
@@ -1309,6 +1423,7 @@ run_booking_flow() {
   local slot slot_element selection_plan status x y
   local -a rapid_slot_labels=() rapid_slot_coordinates=()
   local selected_slot_count=0 use_legacy_slot_selection=0 first_slot_unavailable=0
+  local selection_started=0 leading_unavailable_count=0
   local booked_slot=""
   selection_plan="$(plan_time_slot_selection)"
   if [[ -n "$selection_plan" ]]; then
@@ -1317,15 +1432,17 @@ run_booking_flow() {
         available)
           rapid_slot_labels+=("$slot")
           rapid_slot_coordinates+=("$x,$y")
+          selection_started=1
           ;;
         booked)
-          if [[ "$slot" == "${BOOKING_TIME_SLOTS[0]}" ]]; then
+          if (( selection_started == 0 )); then
             first_slot_unavailable=1
-            printf 'First time slot %s is already booked (red status); skipping it and attempting the remaining slots.\n' "$slot"
+            leading_unavailable_count=$((leading_unavailable_count + 1))
+            printf 'Leading time slot %s is already booked (red status); skipping it and continuing the search.\n' "$slot"
             continue
           fi
           booked_slot="$slot"
-          printf 'Time slot %s is already booked (red status); leaving it untouched and stopping slot selection.\n' "$slot"
+          printf 'Time slot %s is already booked (red status) after selection began; stopping at the gap.\n' "$slot"
           break
           ;;
         missing)
@@ -1382,7 +1499,10 @@ run_booking_flow() {
       break
     done
   fi
-  if (( first_slot_unavailable == 1 )) && [[ -n "$booked_slot" ]]; then
+  if (( leading_unavailable_count > 0 )); then
+    printf 'Selected %s available slot(s) after skipping %s leading unavailable slot(s).\n' \
+      "$selected_slot_count" "$leading_unavailable_count"
+  elif (( first_slot_unavailable == 1 )) && [[ -n "$booked_slot" ]]; then
     printf 'Selected %s available slot(s) after skipping the first slot and before %s became unavailable.\n' \
       "$selected_slot_count" "$booked_slot"
   elif (( first_slot_unavailable == 1 )); then
