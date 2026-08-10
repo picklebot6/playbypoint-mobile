@@ -45,8 +45,13 @@ readonly LOGIN_TIMEOUT="${LOGIN_TIMEOUT:-20}"
 readonly LOGIN_PROMPT_TIMEOUT="${LOGIN_PROMPT_TIMEOUT:-12}"
 readonly NOTIFICATION_PROMPT_TIMEOUT="${NOTIFICATION_PROMPT_TIMEOUT:-3}"
 readonly BOOKING_TIMEOUT="${BOOKING_TIMEOUT:-20}"
+readonly BOOK_NOW_TIMEOUT="${BOOK_NOW_TIMEOUT:-60}"
+readonly BOOK_NOW_ATTEMPTS="${BOOK_NOW_ATTEMPTS:-4}"
+readonly BOOK_NOW_RETRY_INTERVAL="${BOOK_NOW_RETRY_INTERVAL:-60}"
 readonly RUN_BOOKING_FLOW="${RUN_BOOKING_FLOW:-1}"
 readonly APPIUM_START_TIMEOUT="${APPIUM_START_TIMEOUT:-180}"
+readonly APPIUM_API_CONNECT_TIMEOUT="${APPIUM_API_CONNECT_TIMEOUT:-3}"
+readonly APPIUM_API_TIMEOUT="${APPIUM_API_TIMEOUT:-30}"
 readonly TIME_SLOT_AVAILABILITY_TIMEOUT="${TIME_SLOT_AVAILABILITY_TIMEOUT:-500}"
 readonly ADDITIONAL_PLAYER_NAME="${ADDITIONAL_PLAYER_NAME:-philip pham}"
 readonly ELEMENT_POLL_INTERVAL="${ELEMENT_POLL_INTERVAL:-0.1}"
@@ -101,6 +106,10 @@ Common options:
   UDID=<device-id>        Device/emulator UDID (recommended if several exist)
   DEVICE_NAME=<name>      Appium device name
   APPIUM_SERVER_URL=<url> Existing Appium server (default: http://127.0.0.1:4723)
+  APPIUM_API_TIMEOUT=<s>  Maximum time for an Appium request (default: 30)
+  BOOK_NOW_TIMEOUT=<s>    Wait during each club-page attempt (default: 60)
+  BOOK_NOW_ATTEMPTS=<n>   Total Book Now attempts (default: 4)
+  BOOK_NOW_RETRY_INTERVAL=<s> Seconds between attempt starts (default: 60)
   START_APPIUM=0          Do not start Appium when the server is unavailable
   KEEP_SESSION=1          Keep the Appium session alive after the script exits
 
@@ -167,7 +176,8 @@ api() {
   local method="$1"
   local path="$2"
   local body="${3:-}"
-  local args=(-sS -X "$method" -H 'Content-Type: application/json')
+  local args=(-sS --connect-timeout "$APPIUM_API_CONNECT_TIMEOUT" --max-time "$APPIUM_API_TIMEOUT" \
+    -X "$method" -H 'Content-Type: application/json')
 
   if [[ -n "$body" ]]; then
     printf '%s' "$body" | curl "${args[@]}" --data-binary @- "${APPIUM_SERVER_URL}${path}"
@@ -178,6 +188,44 @@ api() {
 
 server_is_ready() {
   curl -fsS --connect-timeout 1 --max-time 2 "${APPIUM_SERVER_URL}/status" >/dev/null 2>&1
+}
+
+save_failure_diagnostics() {
+  local label="$1" timestamp safe_label diagnostic_dir
+  local source_response screenshot_response source_file screenshot_file
+  [[ -n "$SESSION_ID" ]] || return 0
+
+  timestamp="$(date '+%Y%m%d-%H%M%S')"
+  safe_label="$(printf '%s' "$label" | tr -cs '[:alnum:].-' '_')"
+  diagnostic_dir="${PROJECT_DIR}/logs/diagnostics"
+  source_file="${diagnostic_dir}/${timestamp}-${safe_label}.xml"
+  screenshot_file="${diagnostic_dir}/${timestamp}-${safe_label}.png"
+  mkdir -p "$diagnostic_dir"
+
+  source_response="$(api GET "/session/${SESSION_ID}/source" 2>/dev/null || true)"
+  if ! printf '%s' "$source_response" | json_value 'value' >"$source_file" || [[ ! -s "$source_file" ]]; then
+    rm -f "$source_file"
+    source_file=""
+  fi
+
+  screenshot_response="$(api GET "/session/${SESSION_ID}/screenshot" 2>/dev/null || true)"
+  if ! printf '%s' "$screenshot_response" | json_value 'value' | "${PYTHON_CMD[@]}" -c '
+import base64
+import sys
+
+destination = sys.argv[1]
+encoded = sys.stdin.read().strip()
+if not encoded:
+    raise SystemExit(1)
+with open(destination, "wb") as output:
+    output.write(base64.b64decode(encoded, validate=True))
+' "$screenshot_file" || [[ ! -s "$screenshot_file" ]]; then
+    rm -f "$screenshot_file"
+    screenshot_file=""
+  fi
+
+  [[ -z "$source_file" ]] || printf 'Saved failure page source: %s\n' "$source_file" >&2
+  [[ -z "$screenshot_file" ]] || printf 'Saved failure screenshot: %s\n' "$screenshot_file" >&2
 }
 
 cleanup() {
@@ -1376,18 +1424,77 @@ run_booking_flow() {
   )
 
   local pickleball_element book_now_element clubs_tab_element
-  book_now_element="$(find_any_candidate_once "${book_now_candidates[@]}" 2>/dev/null || true)"
-  if [[ -z "$book_now_element" ]]; then
-    if clubs_tab_element="$(find_any_candidate_once "${clubs_tab_candidates[@]}" 2>/dev/null)"; then
-      printf 'Opening the Clubs tab after the fresh app launch...\n'
-      click_element "$clubs_tab_element"
-      book_now_element="$(find_with_candidates "$BOOKING_TIMEOUT" 'Book now button' "${book_now_candidates[@]}")"
-    fi
-  fi
-  [[ -n "$book_now_element" ]] || die "Could not find the club page containing Book now after fresh app launch"
+  local booking_app_id="$ANDROID_PACKAGE" attempt attempt_started navigation_deadline
+  local clubs_tab_opened navigation_failed book_now_clicked=0 retry_at remaining
+  [[ "$PLATFORM" == "android" ]] || booking_app_id="$IOS_BUNDLE_ID"
 
-  printf 'Clicking Book now...\n'
-  click_element "$book_now_element"
+  for ((attempt = 1; attempt <= BOOK_NOW_ATTEMPTS; attempt++)); do
+    attempt_started=$SECONDS
+    navigation_deadline=$((attempt_started + BOOK_NOW_TIMEOUT))
+    clubs_tab_opened=0
+    navigation_failed=0
+    book_now_element=""
+    printf 'Book now attempt %d/%d: waiting up to %ss for Book now or the Clubs tab...\n' \
+      "$attempt" "$BOOK_NOW_ATTEMPTS" "$BOOK_NOW_TIMEOUT"
+
+    while (( SECONDS < navigation_deadline )); do
+      book_now_element="$(find_any_candidate_once "${book_now_candidates[@]}" 2>/dev/null || true)"
+      [[ -z "$book_now_element" ]] || break
+
+      if [[ "$clubs_tab_opened" == "0" ]]; then
+        clubs_tab_element="$(find_any_candidate_once "${clubs_tab_candidates[@]}" 2>/dev/null || true)"
+        if [[ -n "$clubs_tab_element" ]]; then
+          printf 'Opening the Clubs tab during Book now attempt %d...\n' "$attempt"
+          if ! click_element "$clubs_tab_element"; then
+            save_failure_diagnostics "clubs-tab-click-failed-attempt-${attempt}"
+            navigation_failed=1
+            break
+          fi
+          clubs_tab_opened=1
+        fi
+      fi
+      sleep "$ELEMENT_POLL_INTERVAL"
+    done
+
+    if [[ "$navigation_failed" == "0" && -n "$book_now_element" ]]; then
+      printf 'Clicking Book now (attempt %d/%d)...\n' "$attempt" "$BOOK_NOW_ATTEMPTS"
+      if click_element "$book_now_element"; then
+        book_now_clicked=1
+        break
+      fi
+      save_failure_diagnostics "book-now-click-failed-attempt-${attempt}"
+    elif [[ "$navigation_failed" == "0" ]]; then
+      save_failure_diagnostics "book-now-not-found-attempt-${attempt}"
+    fi
+
+    if (( attempt < BOOK_NOW_ATTEMPTS )); then
+      printf 'Book now attempt %d failed; closing Playbypoint before retry %d/%d...\n' \
+        "$attempt" "$((attempt + 1))" "$BOOK_NOW_ATTEMPTS"
+      api POST "/session/${SESSION_ID}/execute/sync" \
+        "{\"script\":\"mobile: terminateApp\",\"args\":[{\"appId\":$(printf '%s' "$booking_app_id" | json_quote)}]}" \
+        >/dev/null 2>&1 || true
+
+      retry_at=$((attempt_started + BOOK_NOW_RETRY_INTERVAL))
+      remaining=$((retry_at - SECONDS))
+      if (( remaining > 0 )); then
+        printf 'Waiting %ss before the next Book now attempt...\n' "$remaining"
+        sleep "$remaining"
+      fi
+
+      printf 'Reopening Playbypoint for Book now attempt %d/%d...\n' \
+        "$((attempt + 1))" "$BOOK_NOW_ATTEMPTS"
+      if ! api POST "/session/${SESSION_ID}/execute/sync" \
+        "{\"script\":\"mobile: activateApp\",\"args\":[{\"appId\":$(printf '%s' "$booking_app_id" | json_quote)}]}" \
+        >/dev/null; then
+        save_failure_diagnostics "app-reopen-failed-attempt-$((attempt + 1))"
+        printf 'Could not reopen Playbypoint for attempt %d; the next attempt will continue polling.\n' \
+          "$((attempt + 1))" >&2
+      fi
+    fi
+  done
+
+  [[ "$book_now_clicked" == "1" ]] || \
+    die "Could not click Book now after ${BOOK_NOW_ATTEMPTS} attempts at ${BOOK_NOW_RETRY_INTERVAL}s intervals"
   printf 'Selecting Reserve a full court...\n'
   click_first_candidate "$BOOKING_TIMEOUT" 'Reserve a full court option' "${reserve_candidates[@]}"
   printf 'Clicking Next...\n'
@@ -1582,6 +1689,11 @@ main() {
     [[ "$START_APPIUM" == "1" ]] || die "Appium is not reachable at ${APPIUM_SERVER_URL}"
     command_exists appium || die "Appium is not running and the 'appium' command is unavailable"
     mkdir -p "$(dirname "$APPIUM_LOG")"
+    if [[ -s "$APPIUM_LOG" ]]; then
+      local archived_appium_log="${APPIUM_LOG}.$(date '+%Y%m%d-%H%M%S')"
+      mv "$APPIUM_LOG" "$archived_appium_log"
+      printf 'Archived previous Appium log: %s\n' "$archived_appium_log"
+    fi
     printf 'Starting Appium (log: %s)...\n' "$APPIUM_LOG"
     appium >"$APPIUM_LOG" 2>&1 &
     APPIUM_PID=$!
