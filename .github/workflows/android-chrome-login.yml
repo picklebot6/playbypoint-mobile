@@ -41,7 +41,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader
           script: |
-            echo "Setting Android display to Medium Desktop dimensions..."
+            echo "Setting Android display size..."
             adb shell wm size 3840x2160
             adb shell wm density 320
 
@@ -55,15 +55,8 @@ jobs:
 
             sleep 5
 
-            if [ -z "$PLAYBYPOINT_EMAIL" ]; then
-              echo "PLAYBYPOINT_EMAIL is missing"
-              exit 1
-            fi
-
-            if [ -z "$PLAYBYPOINT_PASSWORD" ]; then
-              echo "PLAYBYPOINT_PASSWORD is missing"
-              exit 1
-            fi
+            test -n "$PLAYBYPOINT_EMAIL" || (echo "PLAYBYPOINT_EMAIL is missing"; exit 1)
+            test -n "$PLAYBYPOINT_PASSWORD" || (echo "PLAYBYPOINT_PASSWORD is missing"; exit 1)
 
             echo "Credentials are available."
 
