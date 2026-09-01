@@ -1,0 +1,48 @@
+name: Android Chrome Login Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android-chrome-login:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start Android emulator and run test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: playstore
+          arch: x86_64
+          profile: pixel_2
+          force-avd-creation: true
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          script: |
+            npx appium driver install uiautomator2
+            npx appium --allow-insecure uiautomator2:chromedriver_autodownload > appium.log 2>&1 &
+            sleep 5
+            npx tsx scripts/android-chrome-login.ts
+        env:
+          PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
+          PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-chrome-login-result
+          path: |
+            post-login.png
+            appium.log

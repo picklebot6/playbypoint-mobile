@@ -4,13 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "android-chrome-login": "bash -c 'source scripts/playbypoint-credentials.local.sh && export PLAYBYPOINT_EMAIL PLAYBYPOINT_PASSWORD && npx tsx scripts/android-chrome-login.ts'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "appium": "^3.6.0"
+    "appium": "^3.6.0",
+    "appium-uiautomator2-driver": "^8.5.2",
+    "webdriverio": "^9.31.5"
   }
 }
