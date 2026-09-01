@@ -27,7 +27,7 @@ jobs:
           arch: x86_64
           force-avd-creation: true
           disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader
           script: |
             npx appium driver install uiautomator2
 
