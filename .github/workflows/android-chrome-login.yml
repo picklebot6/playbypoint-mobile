@@ -19,6 +19,18 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Check KVM
+        run: |
+          ls -l /dev/kvm
+          groups
+
       - name: Start Android emulator and run test
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -35,9 +47,13 @@ jobs:
               --allow-insecure uiautomator2:chromedriver_autodownload \
               > appium.log 2>&1 &
 
+            APPIUM_PID=$!
+
             sleep 5
 
             npx tsx scripts/android-chrome-login.ts
+
+            kill "$APPIUM_PID" || true
         env:
           PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
           PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
