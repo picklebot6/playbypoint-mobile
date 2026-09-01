@@ -41,17 +41,33 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader
           script: |
+            echo "Setting Android display to Medium Desktop dimensions..."
+            adb shell wm size 3840x2160
+            adb shell wm density 320
+
+            echo "Android display configuration:"
+            adb shell wm size
+            adb shell wm density
+
             npx appium driver list --installed
 
             npx appium --allow-insecure uiautomator2:chromedriver_autodownload > appium.log 2>&1 &
 
-            APPIUM_PID=$!
-
             sleep 5
 
-            npx tsx scripts/android-chrome-login.ts
+            if [ -z "$PLAYBYPOINT_EMAIL" ]; then
+              echo "PLAYBYPOINT_EMAIL is missing"
+              exit 1
+            fi
 
-            kill "$APPIUM_PID" || true
+            if [ -z "$PLAYBYPOINT_PASSWORD" ]; then
+              echo "PLAYBYPOINT_PASSWORD is missing"
+              exit 1
+            fi
+
+            echo "Credentials are available."
+
+            npx tsx scripts/android-chrome-login.ts
         env:
           PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
           PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
