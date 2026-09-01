@@ -43,9 +43,7 @@ jobs:
           script: |
             npx appium driver list --installed
 
-            npx appium \
-              --allow-insecure uiautomator2:chromedriver_autodownload \
-              > appium.log 2>&1 &
+            npx appium --allow-insecure uiautomator2:chromedriver_autodownload > appium.log 2>&1 &
 
             APPIUM_PID=$!
 
