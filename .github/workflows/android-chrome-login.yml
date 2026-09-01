@@ -41,7 +41,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader
           script: |
-            npx appium driver install uiautomator2
+            npx appium driver list --installed
 
             npx appium \
               --allow-insecure uiautomator2:chromedriver_autodownload \
