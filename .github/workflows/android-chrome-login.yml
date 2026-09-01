@@ -41,13 +41,17 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader
           script: |
-            echo "Setting Android display size..."
+            echo "Setting Android display size and locking landscape orientation..."
+            adb shell wm user-rotation lock 1
             adb shell wm size 3840x2160
             adb shell wm density 320
+            adb shell am force-stop com.android.chrome
+            sleep 3
 
             echo "Android display configuration:"
             adb shell wm size
             adb shell wm density
+            adb shell wm user-rotation
 
             echo "Appium drivers:"
             npx appium driver list --installed
@@ -61,7 +65,7 @@ jobs:
 
             echo "Credentials are available."
 
-            npx tsx scripts/android-chrome-login.ts
+            npx tsx tests/android-chrome/login.test.ts
 
         env:
           PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
