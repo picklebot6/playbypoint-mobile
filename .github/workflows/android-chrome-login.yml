@@ -49,6 +49,7 @@ jobs:
             adb shell wm size
             adb shell wm density
 
+            echo "Appium drivers:"
             npx appium driver list --installed
 
             npx appium --allow-insecure uiautomator2:chromedriver_autodownload > appium.log 2>&1 &
@@ -61,15 +62,45 @@ jobs:
             echo "Credentials are available."
 
             npx tsx scripts/android-chrome-login.ts
+
         env:
           PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
           PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
 
-      - name: Upload test artifacts
+      - name: Upload screenshot
         if: always()
-        uses: actions/upload-artifact@v6
+        id: upload-screenshot
+        uses: actions/upload-artifact@v7
         with:
-          name: android-chrome-login
-          path: |
-            post-login.png
-            appium.log
+          path: post-login.png
+          archive: false
+          if-no-files-found: warn
+
+      - name: Show screenshot in summary
+        if: always()
+        env:
+          ARTIFACT_ID: ${{ steps.upload-screenshot.outputs.artifact-id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "No screenshot artifact was created." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          BLOB_URL=$(curl -Ls \
+            -o /dev/null \
+            -w '%{url_effective}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip")
+
+          echo "## Post-login Screenshot" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "![Post-login screenshot](${BLOB_URL})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Appium log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-chrome-login-logs
+          path: appium.log
+          if-no-files-found: warn
