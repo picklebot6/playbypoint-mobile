@@ -17,21 +17,49 @@ async function main() {
   try {
     await browser.url("https://app.playbypoint.com/users/sign_in");
 
-    await browser.$("#user_email").setValue(process.env.PLAYBYPOINT_EMAIL ?? "");
-    await browser.$("#user_password").setValue(process.env.PLAYBYPOINT_PASSWORD ?? "");
+    await browser
+      .$("#user_email")
+      .setValue(process.env.PLAYBYPOINT_EMAIL ?? "");
+
+    await browser
+      .$("#user_password")
+      .setValue(process.env.PLAYBYPOINT_PASSWORD ?? "");
 
     console.log("Clicking Sign in...");
-    await browser.$("input[value='Sign in']").click();
+
+    await browser
+      .$("input[value='Sign in']")
+      .click();
 
     console.log("Click returned. Waiting for login...");
+
     await browser.pause(10000);
 
     console.log("URL after login:", await browser.getUrl());
 
+    const viewport = await browser.execute(() => ({
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      outerWidth: window.outerWidth,
+      outerHeight: window.outerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      screenWidth: window.screen.width,
+      screenHeight: window.screen.height,
+      availableWidth: window.screen.availWidth,
+      availableHeight: window.screen.availHeight,
+    }));
+
+    console.log("Browser viewport:", viewport);
+
     await browser.saveScreenshot("post-login.png");
+
+    console.log("Saved post-login.png");
   } finally {
     await browser.deleteSession();
   }
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
