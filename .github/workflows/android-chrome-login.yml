@@ -46,6 +46,11 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader
           script: |
             adb shell wm user-rotation lock 1
+            adb shell wm size 3840x2160
+            adb shell wm density 320
+            adb shell am force-stop com.android.chrome
+
+            sleep 3
 
             npx appium driver list --installed
 

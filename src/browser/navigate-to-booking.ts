@@ -3,6 +3,15 @@ import type { Browser } from "webdriverio";
 import { elementWaitMs } from "./config";
 import { bookingSelectors } from "./selectors";
 
+function getNextWeek(): string {
+    const now = new Date();
+    const pstNowString = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+    const pstNow = new Date(pstNowString);
+    const sevenDaysLater = new Date(pstNow.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const dayOfMonth = sevenDaysLater.getDate().toString().padStart(2, '0');
+    return `//div[@class='day_number' and text()='${dayOfMonth}']`;
+}
+
 function selectorIsConfigured(xpath: string) {
   return xpath.length > 0 && !xpath.startsWith("REPLACE_WITH_");
 }
@@ -134,5 +143,11 @@ export async function navigateToBooking(browser: Browser) {
     browser,
     "Type: Pickleball",
     bookingSelectors.typePickleball,
+  );
+
+  await clickXPath(
+    browser,
+    "Next Week",
+    getNextWeek(),
   );
 }
