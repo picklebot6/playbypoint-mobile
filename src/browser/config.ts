@@ -3,7 +3,7 @@ export const loginUrl = "https://app.playbypoint.com/users/sign_in";
 export const androidChromeOptions = {
   hostname: "127.0.0.1",
   port: 4723,
-  logLevel: "error" as const,
+  logLevel: "silent" as const,
   capabilities: {
     platformName: "Android",
     browserName: "Chrome",

@@ -26,20 +26,10 @@ async function typeIntoSelector(
     timeoutMsg: `${name} was not visible after ${elementWaitMs / 1000} seconds`,
   });
 
-  // await element.waitForEnabled({
-  //   timeout: elementWaitMs,
-  //   timeoutMsg: `${name} was not enabled after ${elementWaitMs / 1000} seconds`,
-  // });
-
-  // await element.waitForClickable({
-  //   timeout: elementWaitMs,
-  //   timeoutMsg: `${name} was not clickable after ${elementWaitMs / 1000} seconds`,
-  // });
-
   await element.click();
-  await browser.pause(1_000);
-  await element.clearValue();
-  await browser.pause(1_000);
+  // await browser.pause(1_000);
+  // await element.clearValue();
+  // await browser.pause(1_000);
   await element.setValue(value);
   await browser.pause(1_000);
 

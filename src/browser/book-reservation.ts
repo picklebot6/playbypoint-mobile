@@ -1,4 +1,6 @@
 import type { Browser } from "webdriverio";
+import { bookingSelectors } from "./selectors";
+import { pause } from "./main";
 
 export type ReservationInputs = {
   courtHierarchy: readonly string[];
@@ -14,8 +16,35 @@ function courtPath(court : string) : string {
     return `//h2[normalize-space()='Select Detail']/..//button[normalize-space()='Pickleball ${court}']`
 }
 
+function secondaryPath(name : string) : string {
+    return `//span[text()='${name}']/ancestor::div[contains(@class,'flex_grow')]/following-sibling::div/button[text()='Add']`
+}
+
 function selectorIsConfigured(xpath: string) {
   return xpath.length > 0 && !xpath.startsWith("REPLACE_WITH_");
+}
+
+
+async function getAlertText(browser: Browser) {
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const alertText = await browser.getAlertText();
+
+      console.log("Alert text:", alertText);
+
+      await browser.acceptAlert();
+
+      return alertText;
+    } catch {
+      if (attempt < maxAttempts) {
+        await browser.pause(500);
+      }
+    }
+  }
+
+  return null;
 }
 
 async function hasVisibleMatch(browser: Browser, xpath: string) {
@@ -30,71 +59,31 @@ async function hasVisibleMatch(browser: Browser, xpath: string) {
   return false;
 }
 
-async function clickXPath(
+async function getTextContent(
   browser: Browser,
   name: string,
   xpath: string,
-) {
-  if (!selectorIsConfigured(xpath)) {
-    throw new Error(
-      `Define the XPath for ${name} in src/browser/selectors.ts`,
-    );
-  }
+): Promise<string> {
+  const element = browser.$(xpath);
+  let text = "";
 
-  console.log(`Looking for ${name}...`);
+  await browser.waitUntil(
+    async () => {
+      const value = await element.getProperty("textContent");
+      text = String(value ?? "").trim();
 
-  const maximumAttempts = 2;
-  const attemptWaitMs = 10_000;
+      return text.length > 0;
+    },
+    {
+      timeout: 15_000,
+      interval: 500,
+      timeoutMsg: `${name} did not have text after 15 seconds`,
+    },
+  );
 
-  for (let attempt = 1; attempt <= maximumAttempts; attempt++) {
-    console.log(
-      `${name} attempt ${attempt}: waiting up to ${attemptWaitMs / 1000} seconds...`,
-    );
+  console.log(`${name}: ${text}`);
 
-    try {
-      await browser.waitUntil(
-        () => hasVisibleMatch(browser, xpath),
-        {
-          timeout: attemptWaitMs,
-          interval: 500,
-          timeoutMsg: `${name} did not become visible within 10 seconds`,
-        },
-      );
-    } catch {
-      console.log(
-        `${name} did not become visible during attempt ${attempt}`,
-      );
-    }
-
-    const elements = await browser.$$(xpath).getElements();
-
-    console.log(
-      `${name} matches on attempt ${attempt}: ${elements.length}`,
-    );
-
-    for await (const [index, element] of elements.entries()) {
-      const displayed = await element.isDisplayed();
-
-      console.log(
-        `${name} candidate ${index + 1} displayed: ${displayed}`,
-      );
-
-      if (!displayed) {
-        continue;
-      }
-
-      await element.click();
-        await browser.pause(1000);
-        console.log(`Clicked visible ${name} candidate ${index + 1}`);
-        return;
-    }
-
-    if (attempt < maximumAttempts) {
-      console.log(`${name} not found or clickable. Retrying once...`);
-    }
-  }
-
-  throw new Error(`${name} was not found or clickable`);
+  return text;
 }
 
 async function clickXPathFast(
@@ -108,21 +97,38 @@ async function clickXPathFast(
     );
   }
 
-  // console.log(`Looking for ${name}...`);
+  const maxAttempts = 5;
 
-  const maximumAttempts = 1;
+  for (let clickAttempt = 1; clickAttempt <= maxAttempts; clickAttempt++) {
+    try {
+      const elements = await browser.$$(xpath).getElements();
 
-  for (let attempt = 1; attempt <= maximumAttempts; attempt++) {
-    const elements = await browser.$$(xpath).getElements();
-    for await (const [index, element] of elements.entries()) {
-      console.log(
-        `Fast clicking: ${name}`,
-      );
+      if (elements.length === 0) {
+        continue;
+      }
 
-      await element.click();
-      await browser.pause(100);
-      console.log(`Clicked visible ${name} candidate ${index + 1}`);
+      const element = elements[0];
+
+      if (name == "Add Secondary") {
+        await browser.pause(1000);
+      }
+
+      await browser.execute((el) => {
+        (el as HTMLElement).click();
+      }, element);
+
+      // await elements[0].click();
+
+      console.log(`Fast Clicked ${name}`);
       return true;
+    } catch (error) {
+      console.log(`Fast Click attempt ${clickAttempt} failed`);
+
+      if (clickAttempt === maxAttempts) {
+        throw error;
+      }
+
+      await browser.pause(100);
     }
   }
 
@@ -145,7 +151,7 @@ export async function bookReservation(
 
   // check if counter is visible
 
-  // if no counter, click the courts
+  // if no counter, click the times
   for (const time of desiredTimes) {
     await clickXPathFast(
       browser,
@@ -155,9 +161,11 @@ export async function bookReservation(
   }
 
   // click courts
+  let attemptedCourts = [];
   let selectedCourt: string | undefined;
 
   for (const court of courtHierarchy) {
+    attemptedCourts.push(court)
     const clicked = await clickXPathFast(
       browser,
       `Court ${court}`,
@@ -176,6 +184,93 @@ export async function bookReservation(
     throw new Error("None of the preferred courts could be clicked");
   }
 
-  console.log(`Selected preferred court ${selectedCourt}`);
+  // next
+  await clickXPathFast(
+    browser,
+    "Next",
+    bookingSelectors.nextCourt,
+  );
+
+  // Add user
+  await clickXPathFast(
+    browser,
+    "Add User",
+    bookingSelectors.addUser,
+  );
+
+  // Add secondary
+  await clickXPathFast(
+    browser,
+    "Add Secondary",
+    secondaryPath(secondary),
+  );
+
+  // Next
+  await clickXPathFast(
+    browser,
+    "Next",
+    bookingSelectors.nextUser,
+  );
+
+  // Book
+  await clickXPathFast(
+    browser,
+    "Book",
+    bookingSelectors.book,
+  );
+
+  let alertText = await getAlertText(browser)
+
+  while (alertText !== null) {
+    // if all courts have been attempted, break loop
+    if (attemptedCourts.length >= courtHierarchy.length) {
+      break;
+    }
+
+    // reset alert text
+    alertText = null;
+
+    // select next available court
+    for (const court of courtHierarchy) {
+      if (attemptedCourts.includes(court)) {
+        continue;
+      }
+      attemptedCourts.push(court)
+      const clicked = await clickXPathFast(
+        browser,
+        `Court ${court}`,
+        courtPath(court),
+      );
+
+      if (clicked) {
+        selectedCourt = court;
+        break;
+      } else {
+        console.log(`Court ${court} not available`)
+      }
+    }
+
+    // book again
+    await clickXPathFast(
+      browser,
+      "Book",
+      bookingSelectors.book,
+    );
+
+    alertText = await getAlertText(browser)
+  }
+
+  if (alertText !== null) {
+    console.log(`Booking could not be completed for this reason: ${alertText}`)
+  } else {
+    // get confirmation number
+    const confirmationNumber = await getTextContent(
+      browser,
+      "Confirmation Number",
+      bookingSelectors.confirmationNumber,
+    );
+    console.log(`Confirmation Number: ${confirmationNumber}`)
+  }
+
   await browser.pause(3_000);
 }
