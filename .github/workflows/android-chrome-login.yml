@@ -46,7 +46,7 @@ jobs:
           arch: x86_64
           force-avd-creation: true
           disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader
+          emulator-options: "-no-window -no-audio -no-boot-anim -no-metrics -gpu swiftshader_indirect -feature -Vulkan > emulator.log 2>&1"
           script: |
             adb shell wm user-rotation lock 1
             adb shell wm size 3840x2160
@@ -58,8 +58,6 @@ jobs:
             adb shell wm size
             adb shell wm density
             adb shell wm user-rotation
-
-            npx appium driver list --installed
 
             npx appium --log-level error --log-no-colors --allow-insecure uiautomator2:chromedriver_autodownload > appium.log 2>&1 &
 
@@ -102,5 +100,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: android-chrome-main-logs
-          path: appium.log
+          path: |
+            appium.log
+            emulator.log
           if-no-files-found: ignore
