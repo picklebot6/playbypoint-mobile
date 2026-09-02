@@ -63,24 +63,7 @@ jobs:
 
             sleep 5
 
-            adb shell screenrecord \
-              --size 1920x1080 \
-              --bit-rate 6000000 \
-              --time-limit 180 \
-              /sdcard/main-workflow.mp4 > screenrecord.log 2>&1 &
-            SCREENRECORD_PID=$!
-
-            set +e
-            printf '\n' | npx tsx src/browser/main.ts
-            WORKFLOW_STATUS=$?
-
-            kill -INT "$SCREENRECORD_PID" 2>/dev/null || true
-            wait "$SCREENRECORD_PID" 2>/dev/null || true
-            sleep 1
-            adb pull /sdcard/main-workflow.mp4 main-workflow.mp4 || true
-
-            set -e
-            exit "$WORKFLOW_STATUS"
+            bash -c 'adb shell screenrecord --size 1920x1080 --bit-rate 6000000 --time-limit 180 /sdcard/main-workflow.mp4 > screenrecord.log 2>&1 & screenrecord_pid=$!; set +e; printf "\n" | npx tsx src/browser/main.ts; workflow_status=$?; kill -INT "$screenrecord_pid" 2>/dev/null || true; wait "$screenrecord_pid" 2>/dev/null || true; sleep 1; adb pull /sdcard/main-workflow.mp4 main-workflow.mp4 || true; exit "$workflow_status"'
 
       - name: Upload booking screenshot
         if: always()
