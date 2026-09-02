@@ -29,7 +29,9 @@ type BrowserWorkflowStep = {
 
 export const bookingInputs: NavigateToBookingInputs = {
   courtHierarchy: ["2", "3", "4", "8", "9", "1", "7", "5", "6", "10"],
-  desiredTimes: ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"],
+  // desiredTimes: ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"],
+  desiredTimes: ["9-9:30pm","9:30-10pm"],
+
   secondary: "Paul Rodriguez",
 };
 

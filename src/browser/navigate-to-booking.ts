@@ -91,10 +91,15 @@ async function clickXPath(
         continue;
       }
 
-      await element.scrollIntoView({
-        block: "center",
-        inline: "center",
-      });
+      // await element.scrollIntoView({
+      //   block: "center",
+      //   inline: "center",
+      // });
+
+      await element.click();
+        await browser.pause(250);
+        console.log(`Clicked visible ${name} candidate ${index + 1}`);
+        return;
 
       const clickable = await element.isClickable();
 
@@ -171,4 +176,14 @@ export async function navigateToBooking(
     "Next Week",
     getNextWeek(),
   );
+
+  for (const time of desiredTimes) {
+    await clickXPath(
+      browser,
+      time,
+      desiredTimePath(time),
+    );
+  }
+
+  await browser.pause(3_000);
 }

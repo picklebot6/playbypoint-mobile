@@ -37,7 +37,9 @@ async function typeIntoSelector(
   });
 
   await element.click();
+  await browser.pause(1_000);
   await element.clearValue();
+  await browser.pause(1_000);
   await element.setValue(value);
   await browser.pause(1_000);
 
