@@ -13,6 +13,7 @@ import {
 
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { bookReservation, ReservationInputs } from "./book-reservation";
 
 export async function pause(message = "Press Enter to continue...") {
   const readline = createInterface({ input, output });
@@ -27,10 +28,11 @@ type BrowserWorkflowStep = {
   run: (browser: Browser) => Promise<void>;
 };
 
-export const bookingInputs: NavigateToBookingInputs = {
-  courtHierarchy: ["2", "3", "4", "8", "9", "1", "7", "5", "6", "10"],
+export const bookingInputs: ReservationInputs = {
+  courtHierarchy: ["8","9","4", "3", "8", "9", "2", "6", "1", "5", "10", "7"],
   // desiredTimes: ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"],
-  desiredTimes: ["9-9:30pm","9:30-10pm"],
+  desiredTimes: ['2-2:30pm','2:30-3pm','3-3:30pm','3:30-4pm'],
+  // desiredTimes: ["9-9:30pm","9:30-10pm"],
 
   secondary: "Paul Rodriguez",
 };
@@ -42,16 +44,19 @@ export const availableSteps: Record<string, BrowserWorkflowStep> = {
   },
   navigateToBooking: {
     name: "navigate to booking",
-    run: (browser) => navigateToBooking(browser, bookingInputs),
+    run: navigateToBooking,
+  },
+  bookReservation: {
+    name: "book the reservation",
+    run: (browser) => bookReservation(browser, bookingInputs),
   },
 };
 
 export const workflowSteps: BrowserWorkflowStep[] = [
   availableSteps.login,
   availableSteps.navigateToBooking,
+  availableSteps.bookReservation
 
-  // Uncomment this after defining the booking XPaths in selectors.ts.
-  // availableSteps.navigateToBooking,
 ];
 
 export async function runBrowserWorkflow(
@@ -101,6 +106,7 @@ export async function runBrowserWorkflow(
     );
     throw error;
   } finally {
+    await pause();
     process.removeListener("SIGINT", handleInterrupt);
     process.removeListener("SIGTERM", handleTermination);
 
@@ -112,7 +118,6 @@ export async function runBrowserWorkflow(
       console.error("Failed to save the final screenshot:", screenshotError);
     }
 
-    await pause();
     await closeSession();
   }
 }

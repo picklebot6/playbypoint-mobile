@@ -9,3 +9,4 @@ scripts/playbypoint-credentials.local.sh
 *.p12
 *.jks
 *.keystore
+*.png
