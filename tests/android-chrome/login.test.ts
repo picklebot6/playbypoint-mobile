@@ -1,6 +1,6 @@
-import { runAndroidChromeLogin } from "../../src/browser/run-login";
+import { runBrowserWorkflow } from "../../src/browser/main";
 
-runAndroidChromeLogin().catch((error) => {
+runBrowserWorkflow().catch((error) => {
   console.error(error);
   process.exit(1);
 });

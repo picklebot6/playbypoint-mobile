@@ -3,6 +3,7 @@ export const loginUrl = "https://app.playbypoint.com/users/sign_in";
 export const androidChromeOptions = {
   hostname: "127.0.0.1",
   port: 4723,
+  logLevel: "error" as const,
   capabilities: {
     platformName: "Android",
     browserName: "Chrome",
@@ -13,14 +14,7 @@ export const androidChromeOptions = {
   },
 };
 
-export const desktopViewport = {
-  width: 3840,
-  height: 2160,
-  deviceScaleFactor: 1,
-  mobile: false,
-  screenWidth: 3840,
-  screenHeight: 2160,
-} as const;
-
 export const loginWaitMs = 10_000;
-export const screenshotPath = "post-login.png";
+export const elementWaitMs = 20_000;
+export const errorPauseMs = 30_000;
+export const screenshotPath = "final-workflow.png";

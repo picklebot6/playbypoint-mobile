@@ -3,3 +3,10 @@ export const loginSelectors = {
   password: "#user_password",
   signIn: "input[value='Sign in']",
 } as const;
+
+export const bookingSelectors = {
+  frame: "iframe[src*='greenfield.playbypoint.com']",
+  bookNow: "//span[normalize-space()='Book Now']/ancestor::button[1]",
+  reserveFullCourt: "//span[contains(text(),'Reserve a full court')]/ancestor::button",
+  next: "//span[text()='Next']"
+} as const;

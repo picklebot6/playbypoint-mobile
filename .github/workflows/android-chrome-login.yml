@@ -1,10 +1,10 @@
-name: Android Chrome Login Test
+name: Android Chrome Main Workflow
 
 on:
   workflow_dispatch:
 
 jobs:
-  android-chrome-login:
+  android-chrome-main:
     runs-on: ubuntu-22.04
 
     steps:
@@ -31,7 +31,7 @@ jobs:
           ls -l /dev/kvm
           groups
 
-      - name: Start Android emulator and run test
+      - name: Start Android emulator and run main workflow
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -65,18 +65,18 @@ jobs:
 
             echo "Credentials are available."
 
-            npx tsx tests/android-chrome/login.test.ts
+            printf '\n' | npx tsx src/browser/main.ts
 
         env:
           PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
           PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
 
-      - name: Upload screenshot
+      - name: Upload booking screenshot
         if: always()
         id: upload-screenshot
         uses: actions/upload-artifact@v7
         with:
-          path: post-login.png
+          path: final-workflow.png
           archive: false
           if-no-files-found: warn
 
@@ -97,14 +97,14 @@ jobs:
             -H "Authorization: Bearer $GH_TOKEN" \
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip")
 
-          echo "## Post-login Screenshot" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Booking Workflow Screenshot" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "![Post-login screenshot](${BLOB_URL})" >> "$GITHUB_STEP_SUMMARY"
+          echo "![Booking workflow screenshot](${BLOB_URL})" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Appium log
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: android-chrome-login-logs
+          name: android-chrome-main-logs
           path: appium.log
           if-no-files-found: warn
