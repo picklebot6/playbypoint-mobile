@@ -40,19 +40,26 @@ jobs:
           force-avd-creation: true
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader
-          script: |
-            echo "Setting Android display size and locking landscape orientation..."
-            adb shell wm user-rotation lock 1
-            adb shell wm size 3840x2160
-            adb shell wm density 320
-            adb shell am force-stop com.android.chrome
-            sleep 3
 
+          script: |
             echo "Android display configuration:"
             adb shell wm size
             adb shell wm density
             adb shell wm user-rotation
 
+            echo ""
+            echo "Android window/display configuration:"
+            adb shell dumpsys window displays | head -n 100
+
+            echo ""
+            echo "Current focused window:"
+            adb shell dumpsys window | grep -E "mCurrentFocus|mFocusedApp" || true
+
+            echo ""
+            echo "Chrome package:"
+            adb shell pm list packages | grep chrome || true
+
+            echo ""
             echo "Appium drivers:"
             npx appium driver list --installed
 
@@ -60,16 +67,19 @@ jobs:
 
             sleep 5
 
-            test -n "$PLAYBYPOINT_EMAIL" || (echo "PLAYBYPOINT_EMAIL is missing"; exit 1)
-            test -n "$PLAYBYPOINT_PASSWORD" || (echo "PLAYBYPOINT_PASSWORD is missing"; exit 1)
+            test -n "$PLAYBYPOINT_EMAIL" || (
+              echo "PLAYBYPOINT_EMAIL is missing"
+              exit 1
+            )
+
+            test -n "$PLAYBYPOINT_PASSWORD" || (
+              echo "PLAYBYPOINT_PASSWORD is missing"
+              exit 1
+            )
 
             echo "Credentials are available."
 
             printf '\n' | npx tsx src/browser/main.ts
-
-        env:
-          PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
-          PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
 
       - name: Upload booking screenshot
         if: always()

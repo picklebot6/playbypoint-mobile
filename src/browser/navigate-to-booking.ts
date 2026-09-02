@@ -129,4 +129,10 @@ export async function navigateToBooking(browser: Browser) {
     "Next",
     bookingSelectors.next,
   );
+
+  await clickXPath(
+    browser,
+    "Type: Pickleball",
+    bookingSelectors.typePickleball,
+  );
 }
