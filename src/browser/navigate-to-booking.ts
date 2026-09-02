@@ -3,6 +3,12 @@ import type { Browser } from "webdriverio";
 import { elementWaitMs } from "./config";
 import { bookingSelectors } from "./selectors";
 
+export type NavigateToBookingInputs = {
+  courtHierarchy: readonly string[];
+  desiredTimes: readonly string[];
+  secondary: string;
+};
+
 function getNextWeek(): string {
     const now = new Date();
     const pstNowString = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
@@ -112,7 +118,18 @@ async function clickXPath(
   throw new Error(`${name} was not found or clickable`);
 }
 
-export async function navigateToBooking(browser: Browser) {
+export async function navigateToBooking(
+  browser: Browser,
+  inputs: NavigateToBookingInputs,
+) {
+  const { courtHierarchy, desiredTimes, secondary } = inputs;
+
+  console.log("Loaded booking inputs:", {
+    courtHierarchy,
+    desiredTimes,
+    secondary,
+  });
+
   await browser.switchFrame(null);
 
   const bookingFrame = await browser.$(bookingSelectors.frame).getElement();

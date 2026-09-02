@@ -6,7 +6,10 @@ import {
   screenshotPath,
 } from "./config";
 import { logInToPlayByPoint } from "./login";
-import { navigateToBooking } from "./navigate-to-booking";
+import {
+  navigateToBooking,
+  type NavigateToBookingInputs,
+} from "./navigate-to-booking";
 
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
@@ -24,6 +27,12 @@ type BrowserWorkflowStep = {
   run: (browser: Browser) => Promise<void>;
 };
 
+export const bookingInputs: NavigateToBookingInputs = {
+  courtHierarchy: ["2", "3", "4", "8", "9", "1", "7", "5", "6", "10"],
+  desiredTimes: ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"],
+  secondary: "Paul Rodriguez",
+};
+
 export const availableSteps: Record<string, BrowserWorkflowStep> = {
   login: {
     name: "login",
@@ -31,7 +40,7 @@ export const availableSteps: Record<string, BrowserWorkflowStep> = {
   },
   navigateToBooking: {
     name: "navigate to booking",
-    run: navigateToBooking,
+    run: (browser) => navigateToBooking(browser, bookingInputs),
   },
 };
 
