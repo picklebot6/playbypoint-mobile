@@ -40,44 +40,14 @@ jobs:
           force-avd-creation: true
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader
-
           script: |
-            echo "Android display configuration:"
-            adb shell wm size
-            adb shell wm density
-            adb shell wm user-rotation
+            adb shell wm user-rotation lock 1
 
-            echo ""
-            echo "Android window/display configuration:"
-            adb shell dumpsys window displays | head -n 100
-
-            echo ""
-            echo "Current focused window:"
-            adb shell dumpsys window | grep -E "mCurrentFocus|mFocusedApp" || true
-
-            echo ""
-            echo "Chrome package:"
-            adb shell pm list packages | grep chrome || true
-
-            echo ""
-            echo "Appium drivers:"
             npx appium driver list --installed
 
             npx appium --allow-insecure uiautomator2:chromedriver_autodownload > appium.log 2>&1 &
 
             sleep 5
-
-            test -n "$PLAYBYPOINT_EMAIL" || (
-              echo "PLAYBYPOINT_EMAIL is missing"
-              exit 1
-            )
-
-            test -n "$PLAYBYPOINT_PASSWORD" || (
-              echo "PLAYBYPOINT_PASSWORD is missing"
-              exit 1
-            )
-
-            echo "Credentials are available."
 
             printf '\n' | npx tsx src/browser/main.ts
 
