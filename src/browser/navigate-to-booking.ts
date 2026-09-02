@@ -12,6 +12,10 @@ function getNextWeek(): string {
     return `//div[@class='day_number' and text()='${dayOfMonth}']`;
 }
 
+function desiredTimePath(time: string) : string {
+    return `//button[text()='${time}' and not(contains(@class,'basic red'))]`
+}
+
 function selectorIsConfigured(xpath: string) {
   return xpath.length > 0 && !xpath.startsWith("REPLACE_WITH_");
 }

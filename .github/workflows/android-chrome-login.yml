@@ -52,13 +52,17 @@ jobs:
 
             sleep 3
 
+            adb shell wm size
+            adb shell wm density
+            adb shell wm user-rotation
+
             npx appium driver list --installed
 
             npx appium --allow-insecure uiautomator2:chromedriver_autodownload > appium.log 2>&1 &
 
             sleep 5
 
-            printf '\n' | npx tsx src/browser/main.ts 2>&1 | tee main-workflow.log
+            printf '\n' | npx tsx src/browser/main.ts
 
       - name: Upload booking screenshot
         if: always()
@@ -90,12 +94,10 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "![Booking workflow screenshot](${BLOB_URL})" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload workflow logs
+      - name: Upload Appium log
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: android-chrome-main-logs
-          path: |
-            appium.log
-            main-workflow.log
+          path: appium.log
           if-no-files-found: warn
