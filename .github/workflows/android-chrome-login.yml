@@ -7,6 +7,10 @@ jobs:
   android-chrome-main:
     runs-on: ubuntu-22.04
 
+    env:
+      PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
+      PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -49,7 +53,7 @@ jobs:
 
             sleep 5
 
-            printf '\n' | npx tsx src/browser/main.ts
+            printf '\n' | npx tsx src/browser/main.ts 2>&1 | tee main-workflow.log
 
       - name: Upload booking screenshot
         if: always()
@@ -81,10 +85,12 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "![Booking workflow screenshot](${BLOB_URL})" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Appium log
+      - name: Upload workflow logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: android-chrome-main-logs
-          path: appium.log
+          path: |
+            appium.log
+            main-workflow.log
           if-no-files-found: warn
