@@ -10,6 +10,9 @@ jobs:
     env:
       PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
       PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
+      WDIO_LOG_LEVEL: error
+      NPM_CONFIG_LOGLEVEL: error
+      NODE_NO_WARNINGS: 1
 
     steps:
       - name: Checkout
@@ -21,7 +24,7 @@ jobs:
           node-version: 24
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --loglevel=error --no-audit --no-fund
 
       - name: Enable KVM
         run: |
@@ -58,7 +61,7 @@ jobs:
 
             npx appium driver list --installed
 
-            npx appium --allow-insecure uiautomator2:chromedriver_autodownload > appium.log 2>&1 &
+            npx appium --log-level error --log-no-colors --allow-insecure uiautomator2:chromedriver_autodownload > appium.log 2>&1 &
 
             sleep 5
 
@@ -71,7 +74,7 @@ jobs:
         with:
           path: final-workflow.png
           archive: false
-          if-no-files-found: warn
+          if-no-files-found: ignore
 
       - name: Show screenshot in summary
         if: always()
@@ -100,4 +103,4 @@ jobs:
         with:
           name: android-chrome-main-logs
           path: appium.log
-          if-no-files-found: warn
+          if-no-files-found: ignore
