@@ -171,13 +171,11 @@ export async function bookReservation(
   console.log("Continuing in the existing booking iframe");
 
   // wait until time slots are available
-  console.log("start")
   await waitForElementToDisappear(
     browser,
     bookingSelectors.bookingTimer,
   );
-  console.log("end")
-  
+
   // click the times
   for (const time of desiredTimes) {
     await clickXPathFast(
@@ -186,7 +184,6 @@ export async function bookReservation(
       desiredTimePath(time),
     );
   }
-  await pause();
 
   // click courts
   let attemptedCourts = [];
