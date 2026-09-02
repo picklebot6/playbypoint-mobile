@@ -63,7 +63,24 @@ jobs:
 
             sleep 5
 
+            adb shell screenrecord \
+              --size 1920x1080 \
+              --bit-rate 6000000 \
+              --time-limit 180 \
+              /sdcard/main-workflow.mp4 > screenrecord.log 2>&1 &
+            SCREENRECORD_PID=$!
+
+            set +e
             printf '\n' | npx tsx src/browser/main.ts
+            WORKFLOW_STATUS=$?
+
+            kill -INT "$SCREENRECORD_PID" 2>/dev/null || true
+            wait "$SCREENRECORD_PID" 2>/dev/null || true
+            sleep 1
+            adb pull /sdcard/main-workflow.mp4 main-workflow.mp4 || true
+
+            set -e
+            exit "$WORKFLOW_STATUS"
 
       - name: Upload booking screenshot
         if: always()
@@ -95,6 +112,30 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "![Booking workflow screenshot](${BLOB_URL})" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Upload workflow video
+        if: always()
+        id: upload-video
+        uses: actions/upload-artifact@v7
+        with:
+          path: main-workflow.mp4
+          archive: false
+          if-no-files-found: ignore
+
+      - name: Show video in summary
+        if: always()
+        env:
+          VIDEO_URL: ${{ steps.upload-video.outputs.artifact-url }}
+        run: |
+          if [ -z "$VIDEO_URL" ]; then
+            echo "No workflow video was created." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Booking Workflow Video" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Watch or download the workflow recording]($VIDEO_URL)" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Appium log
         if: always()
         uses: actions/upload-artifact@v7
@@ -103,4 +144,5 @@ jobs:
           path: |
             appium.log
             emulator.log
+            screenrecord.log
           if-no-files-found: ignore
