@@ -24,6 +24,30 @@ function selectorIsConfigured(xpath: string) {
   return xpath.length > 0 && !xpath.startsWith("REPLACE_WITH_");
 }
 
+async function waitForElementToDisappear(
+  browser: Browser,
+  xpath: string,
+): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      const elements = await browser.$$(xpath).getElements();
+
+      for (const element of elements) {
+        if (await element.isDisplayed()) {
+          return false;
+        }
+      }
+
+      return true;
+    },
+    {
+      timeout: 5 * 60 * 1000,
+      interval: 250,
+      timeoutMsg: "Element was still displayed after 5 minutes",
+    },
+  );
+}
+
 
 async function getAlertText(browser: Browser) {
   const maxAttempts = 3;
@@ -80,9 +104,6 @@ async function getTextContent(
       timeoutMsg: `${name} did not have text after 15 seconds`,
     },
   );
-
-  console.log(`${name}: ${text}`);
-
   return text;
 }
 
@@ -149,9 +170,15 @@ export async function bookReservation(
 
   console.log("Continuing in the existing booking iframe");
 
-  // check if counter is visible
-
-  // if no counter, click the times
+  // wait until time slots are available
+  console.log("start")
+  await waitForElementToDisappear(
+    browser,
+    bookingSelectors.bookingTimer,
+  );
+  console.log("end")
+  
+  // click the times
   for (const time of desiredTimes) {
     await clickXPathFast(
       browser,
@@ -159,6 +186,7 @@ export async function bookReservation(
       desiredTimePath(time),
     );
   }
+  await pause();
 
   // click courts
   let attemptedCourts = [];
@@ -269,7 +297,7 @@ export async function bookReservation(
       "Confirmation Number",
       bookingSelectors.confirmationNumber,
     );
-    console.log(`Confirmation Number: ${confirmationNumber}`)
+    console.log(`Booking successful! Here is the confirmation number: ${confirmationNumber}`)
   }
 
   await browser.pause(3_000);

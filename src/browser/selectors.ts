@@ -16,4 +16,5 @@ export const bookingSelectors = {
   book: "//button[text()='Book']",
   selectDateTime: "//h2[text()='Select date and time']",
   confirmationNumber: "//div[text()='Confirmation Number']/following-sibling::div",
+  bookingTimer: "//*[contains(normalize-space(text()), 'Booking for this day will open in:')]",
 } as const;
