@@ -63,6 +63,8 @@ export async function runBrowserWorkflow(
   steps: BrowserWorkflowStep[] = workflowSteps,
 ) {
   const browser = await remote(androidChromeOptions);
+  await browser.maximizeWindow();
+  console.log("Chrome maximized");
   let sessionCleanup: Promise<unknown> | undefined;
   let shuttingDown = false;
 
