@@ -131,8 +131,14 @@ async function clickXPathFast(
       const element = elements[0];
 
       if (name == "Add Secondary") {
-        await browser.pause(1000);
+        await browser.pause(750);
       }
+
+      await element.scrollIntoView({
+        behavior: "instant",
+        block: "center",
+        inline: "nearest",
+      });
 
       await browser.execute((el) => {
         (el as HTMLElement).click();
@@ -177,12 +183,21 @@ export async function bookReservation(
   );
 
   // click the times
+  let initialBook = false;
   for (const time of desiredTimes) {
-    await clickXPathFast(
+    let clicked = await clickXPathFast(
       browser,
       time,
       desiredTimePath(time),
     );
+    console.log(`${time}: ${clicked}`)
+    if (clicked) {
+      initialBook = true;
+    } else {
+      if (initialBook) {
+        break;
+      }
+    }
   }
 
   // click courts

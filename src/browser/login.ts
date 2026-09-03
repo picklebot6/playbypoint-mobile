@@ -83,6 +83,7 @@ export async function logInToPlayByPoint(browser: Browser) {
   }
 
   await browser.url(loginUrl);
+  await browser.pause(5000);
 
   await typeIntoSelector(
     browser,
