@@ -134,12 +134,6 @@ async function clickXPathFast(
         await browser.pause(750);
       }
 
-      await element.scrollIntoView({
-        behavior: "instant",
-        block: "center",
-        inline: "nearest",
-      });
-
       await browser.execute((el) => {
         (el as HTMLElement).click();
       }, element);
