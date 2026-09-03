@@ -190,4 +190,9 @@ export async function navigateToBooking(browser: Browser) {
   );
   await browser.pause(5_000);
 
+
+  //temp testing standby for 5 minutes
+  await browser.pause(300000);
+
+
 }
