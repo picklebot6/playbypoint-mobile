@@ -189,12 +189,4 @@ export async function navigateToBooking(browser: Browser) {
     getNextWeek(),
   );
   await browser.pause(5_000);
-
-
-  //temp testing standby for 3 minutes
-  console.log("start of 3 min")
-  await browser.pause(180000);
-  console.log("end of 3 min")
-
-
 }
