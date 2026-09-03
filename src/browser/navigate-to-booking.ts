@@ -191,8 +191,10 @@ export async function navigateToBooking(browser: Browser) {
   await browser.pause(5_000);
 
 
-  //temp testing standby for 5 minutes
-  await browser.pause(300000);
+  //temp testing standby for 3 minutes
+  console.log("start of 3 min")
+  await browser.pause(180000);
+  console.log("end of 3 min")
 
 
 }

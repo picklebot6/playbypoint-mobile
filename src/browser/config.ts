@@ -9,6 +9,7 @@ export const androidChromeOptions = {
     browserName: "Chrome",
     "appium:automationName": "UiAutomator2",
     "appium:deviceName": "Android Emulator",
+    "appium:newCommandTimeout": 600,
     "wdio:enforceWebDriverClassic": true,
     pageLoadStrategy: "none" as const,
   },
