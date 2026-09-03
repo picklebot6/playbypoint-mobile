@@ -24,21 +24,57 @@ function selectorIsConfigured(xpath: string) {
   return xpath.length > 0 && !xpath.startsWith("REPLACE_WITH_");
 }
 
-async function waitForElementToDisappear(
+async function waitForTimer(
   browser: Browser,
   xpath: string,
 ): Promise<void> {
+  let lastLoggedAt = 0;
+
   await browser.waitUntil(
     async () => {
       const elements = await browser.$$(xpath).getElements();
+      let timerIsVisible = false;
 
       for (const element of elements) {
         if (await element.isDisplayed()) {
-          return false;
+          timerIsVisible = true;
+          break;
         }
       }
 
-      return true;
+      if (!timerIsVisible) {
+        await browser.pause(750);
+        return true;
+      }
+
+      const now = Date.now();
+
+      if (now - lastLoggedAt < 1_000) {
+        return false;
+      }
+
+      lastLoggedAt = now;
+
+      const readTimerPart = async (timerPartXpath: string) => {
+        const timerParts = await browser.$$(timerPartXpath).getElements();
+        const timerPart = timerParts[0];
+
+        if (!timerPart) {
+          return "";
+        }
+
+        const textContent = await timerPart.getProperty("textContent");
+        return String(textContent ?? "").trim();
+      };
+
+      const [hours, minutes, seconds] = await Promise.all([
+        readTimerPart(bookingSelectors.hr),
+        readTimerPart(bookingSelectors.min),
+        readTimerPart(bookingSelectors.sec),
+      ]);
+
+      console.log(`Booking opens in: ${hours}:${minutes}:${seconds}`);
+      return false;
     },
     {
       timeout: 5 * 60 * 1000,
@@ -138,8 +174,6 @@ async function clickXPathFast(
         (el as HTMLElement).click();
       }, element);
 
-      // await elements[0].click();
-
       console.log(`Fast Clicked ${name}`);
       return true;
     } catch (error) {
@@ -171,7 +205,7 @@ export async function bookReservation(
   console.log("Continuing in the existing booking iframe");
 
   // wait until time slots are available
-  await waitForElementToDisappear(
+  await waitForTimer(
     browser,
     bookingSelectors.bookingTimer,
   );
@@ -245,6 +279,8 @@ export async function bookReservation(
     "Next",
     bookingSelectors.nextUser,
   );
+
+  await pause();
 
   // Book
   await clickXPathFast(

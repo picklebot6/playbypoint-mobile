@@ -17,10 +17,18 @@ import { bookReservation, ReservationInputs } from "./book-reservation";
 
 export async function pause(message = "Press Enter to continue...") {
   const readline = createInterface({ input, output });
+  const forwardInterrupt = () => {
+    process.kill(process.pid, "SIGINT");
+  };
 
-  await readline.question(message);
+  readline.once("SIGINT", forwardInterrupt);
 
-  readline.close();
+  try {
+    await readline.question(message);
+  } finally {
+    readline.removeListener("SIGINT", forwardInterrupt);
+    readline.close();
+  }
 }
 
 type BrowserWorkflowStep = {
@@ -29,7 +37,7 @@ type BrowserWorkflowStep = {
 };
 
 export const bookingInputs: ReservationInputs = {
-  courtHierarchy: ["4", "3","8","9","2", "6", "1", "5", "10", "7"],
+  courtHierarchy: ["4","8","9","3","2","6","1","5","10","7"],
   desiredTimes: ["8-8:30pm", "8:30-9pm", "9-9:30pm", "9:30-10pm"],
   // desiredTimes: ['2-2:30pm','2:30-3pm','3-3:30pm','3:30-4pm'],
   secondary: "philip pham",
@@ -61,13 +69,13 @@ export async function runBrowserWorkflow(
   steps: BrowserWorkflowStep[] = workflowSteps,
 ) {
   const browser = await remote(androidChromeOptions);
-  await browser.maximizeWindow();
-  console.log("Chrome maximized");
   let sessionCleanup: Promise<unknown> | undefined;
   let shuttingDown = false;
 
   const closeSession = () => {
-    sessionCleanup ??= browser.deleteSession();
+    sessionCleanup ??= browser.deleteSession().then(() => {
+      console.log("Appium session closed");
+    });
     return sessionCleanup;
   };
 
@@ -95,6 +103,9 @@ export async function runBrowserWorkflow(
   process.on("SIGTERM", handleTermination);
 
   try {
+    await browser.maximizeWindow();
+    console.log("Chrome maximized");
+
     for (const step of steps) {
       console.log(`Starting workflow step: ${step.name}`);
       await step.run(browser);
@@ -106,19 +117,21 @@ export async function runBrowserWorkflow(
     );
     throw error;
   } finally {
-    await pause();
-    process.removeListener("SIGINT", handleInterrupt);
-    process.removeListener("SIGTERM", handleTermination);
-
     try {
-      await browser.switchFrame(null);
-      await browser.saveScreenshot(screenshotPath);
-      console.log(`Saved final screenshot to ${screenshotPath}`);
-    } catch (screenshotError) {
-      console.error("Failed to save the final screenshot:", screenshotError);
-    }
+      await pause();
 
-    await closeSession();
+      try {
+        await browser.switchFrame(null);
+        await browser.saveScreenshot(screenshotPath);
+        console.log(`Saved final screenshot to ${screenshotPath}`);
+      } catch (screenshotError) {
+        console.error("Failed to save the final screenshot:", screenshotError);
+      }
+    } finally {
+      await closeSession();
+      process.removeListener("SIGINT", handleInterrupt);
+      process.removeListener("SIGTERM", handleTermination);
+    }
   }
 }
 
