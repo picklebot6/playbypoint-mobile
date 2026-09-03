@@ -64,39 +64,24 @@ jobs:
 
             sleep 5
 
-            (
-              for second in $(seq 1 60); do
-                CHROME_TASK_ID=$(
-                  adb shell dumpsys activity activities |
-                  grep -m1 'A=.*:com.android.chrome' |
-                  sed -E 's/.*#([0-9]+).*/\1/'
-                )
+            bash -c '
+              for second in $(seq 1 120); do
+                CHROME_TASK_ID=$(adb shell dumpsys activity activities | grep -m1 "A=.*:com.android.chrome" | sed -E "s/.*#([0-9]+).*/\1/")
 
                 if [ -n "$CHROME_TASK_ID" ]; then
-                  APP_SIZE=$(
-                    adb shell dumpsys window displays |
-                    grep -m1 'init=.* app=' |
-                    sed -E 's/.*app=([0-9]+x[0-9]+).*/\1/'
-                  )
-
-                  APP_WIDTH=$(echo "$APP_SIZE" | cut -d'x' -f1)
-                  APP_HEIGHT=$(echo "$APP_SIZE" | cut -d'x' -f2)
+                  APP_SIZE=$(adb shell dumpsys window displays | grep -m1 "init=.* app=" | sed -E "s/.*app=([0-9]+x[0-9]+).*/\1/")
+                  APP_WIDTH=$(echo "$APP_SIZE" | cut -d"x" -f1)
+                  APP_HEIGHT=$(echo "$APP_SIZE" | cut -d"x" -f2)
 
                   if [ -n "$APP_WIDTH" ] && [ -n "$APP_HEIGHT" ]; then
-                    adb shell am task resize \
-                      "$CHROME_TASK_ID" \
-                      0 \
-                      0 \
-                      "$APP_WIDTH" \
-                      "$APP_HEIGHT"
-
+                    adb shell am task resize "$CHROME_TASK_ID" 0 0 "$APP_WIDTH" "$APP_HEIGHT"
                     break
                   fi
                 fi
 
                 sleep 1
               done
-            ) &
+            ' &
 
             bash -c 'adb shell screenrecord --size 1920x1080 --bit-rate 6000000 --time-limit 180 /sdcard/main-workflow.mp4 > screenrecord.log 2>&1 & screenrecord_pid=$!; set +e; printf "\n" | npx tsx src/browser/main.ts; workflow_status=$?; adb shell pkill -2 -x screenrecord >/dev/null 2>&1 || true; for second in 1 2 3 4 5; do kill -0 "$screenrecord_pid" 2>/dev/null || break; sleep 1; done; adb shell pkill -9 -x screenrecord >/dev/null 2>&1 || true; kill -TERM "$screenrecord_pid" 2>/dev/null || true; wait "$screenrecord_pid" 2>/dev/null || true; sleep 1; adb pull /sdcard/main-workflow.mp4 main-workflow.mp4 || true; exit "$workflow_status"'
 
