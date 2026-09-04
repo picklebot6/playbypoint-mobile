@@ -68,6 +68,50 @@ export const bookingInputs: ReservationInputs = {
     process.env.PLAYBYPOINT_SECONDARY?.trim() || "philip pham",
 };
 
+function removeWeekendCourts() {
+  const excludedCourts = new Set(["6", "7", "8", "9", "10"]);
+
+  bookingInputs.courtHierarchy = bookingInputs.courtHierarchy.filter(
+    (court) => !excludedCourts.has(court),
+  );
+
+  console.log(
+    `Weekend court hierarchy: ${bookingInputs.courtHierarchy.join(", ")}`,
+  );
+}
+
+export function configureForCurrentDay(): boolean {
+  const timeZone =
+    process.env.PLAYBYPOINT_TIME_ZONE?.trim() || "America/Los_Angeles";
+  const day = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone,
+  }).format(new Date());
+
+  console.log(`Current day in ${timeZone}: ${day}`);
+
+  if (day === "Sunday") {
+    removeWeekendCourts();
+  } else if (day === "Monday") {
+    // Add Monday-specific configuration here.
+  } else if (day === "Tuesday") {
+    // Add Tuesday-specific configuration here.
+  } else if (day === "Wednesday") {
+    // Add Wednesday-specific configuration here.
+    console.log("It's Wednesday. Finishing the workflow without performing any actions.");
+    return false;
+  } else if (day === "Thursday") {
+    // Add Thursday-specific configuration here.
+  } else if (day === "Friday") {
+    console.log("It's Friday. Finishing the workflow without performing any actions.");
+    return false;
+  } else if (day === "Saturday") {
+    removeWeekendCourts();
+  }
+
+  return true;
+}
+
 export const availableSteps: Record<string, BrowserWorkflowStep> = {
   login: {
     name: "login",
@@ -93,6 +137,12 @@ export const workflowSteps: BrowserWorkflowStep[] = [
 export async function runBrowserWorkflow(
   steps: BrowserWorkflowStep[] = workflowSteps,
 ) {
+  if (!configureForCurrentDay()) {
+    return;
+  }
+
+  // await pause();
+
   const browser = await remote(androidChromeOptions);
   let sessionCleanup: Promise<unknown> | undefined;
   let shuttingDown = false;
