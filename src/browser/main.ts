@@ -38,7 +38,8 @@ type BrowserWorkflowStep = {
 
 export const bookingInputs: ReservationInputs = {
   courtHierarchy: ["4","8","9","3","2","6","1","5","10","7"],
-  desiredTimes: ["8-8:30pm", "8:30-9pm", "9-9:30pm", "9:30-10pm"],
+  // desiredTimes: ["11:30-12pm"],
+  desiredTimes: ["7:30-8pm","8-8:30pm", "8:30-9pm", "9-9:30pm"],
   // desiredTimes: ['2-2:30pm','2:30-3pm','3-3:30pm','3:30-4pm'],
   secondary: "philip pham",
 };

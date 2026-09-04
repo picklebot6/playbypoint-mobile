@@ -290,6 +290,25 @@ export async function bookReservation(
   let alertText = await getAlertText(browser)
 
   while (alertText !== null) {
+    while (
+      alertText !== null &&
+      alertText.includes("Too many requests")
+    ) {
+      await browser.pause(10_000);
+
+      await clickXPathFast(
+        browser,
+        "Book",
+        bookingSelectors.book,
+      );
+
+      alertText = await getAlertText(browser);
+    }
+
+    if (alertText === null) {
+      break;
+    }
+
     // if all courts have been attempted, break loop
     if (attemptedCourts.length >= courtHierarchy.length) {
       break;
