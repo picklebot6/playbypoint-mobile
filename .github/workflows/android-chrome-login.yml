@@ -2,37 +2,6 @@ name: Android Chrome Main Workflow
 
 on:
   workflow_dispatch:
-    inputs:
-      run_1_desired_times:
-        description: "Run 1 desired times, comma-separated"
-        required: true
-        default: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
-        type: string
-      run_1_court_hierarchy:
-        description: "Run 1 court order, comma-separated"
-        required: true
-        default: "4,9,2,1,10"
-        type: string
-      run_1_secondary:
-        description: "Run 1 secondary player"
-        required: true
-        default: "philip pham"
-        type: string
-      run_2_desired_times:
-        description: "Run 2 desired times, comma-separated"
-        required: true
-        default: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
-        type: string
-      run_2_court_hierarchy:
-        description: "Run 2 court order, comma-separated"
-        required: true
-        default: "8,3,6,5,7"
-        type: string
-      run_2_secondary:
-        description: "Run 2 secondary player"
-        required: true
-        default: "philip pham"
-        type: string
 
 jobs:
   android-chrome-main:
@@ -45,13 +14,15 @@ jobs:
       matrix:
         include:
           - run_id: 1
-            desired_times: ${{ inputs.run_1_desired_times }}
-            court_hierarchy: ${{ inputs.run_1_court_hierarchy }}
-            secondary: ${{ inputs.run_1_secondary }}
+            # desired_times: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
+            desired_times: "11:30-12pm"
+            court_hierarchy: "4,9,2,1,10"
+            secondary: "philip pham"
           - run_id: 2
-            desired_times: ${{ inputs.run_2_desired_times }}
-            court_hierarchy: ${{ inputs.run_2_court_hierarchy }}
-            secondary: ${{ inputs.run_2_secondary }}
+            # desired_times: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
+            desired_times: "11:30-12pm"
+            court_hierarchy: "8,3,6,5,7"
+            secondary: "philip pham"
 
     env:
       RUN_ID: ${{ matrix.run_id }}

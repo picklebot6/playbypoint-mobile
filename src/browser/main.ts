@@ -60,12 +60,10 @@ export const bookingInputs: ReservationInputs = {
     "PLAYBYPOINT_COURT_HIERARCHY",
     ["4", "8", "9", "3", "2", "6", "1", "5", "10", "7"],
   ),
-  // desiredTimes: ["11:30-12pm"],
   desiredTimes: listInput(
     "PLAYBYPOINT_DESIRED_TIMES",
     ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"],
   ),
-  // desiredTimes: ['2-2:30pm','2:30-3pm','3-3:30pm','3:30-4pm'],
   secondary:
     process.env.PLAYBYPOINT_SECONDARY?.trim() || "philip pham",
 };
