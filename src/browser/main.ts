@@ -36,12 +36,38 @@ type BrowserWorkflowStep = {
   run: (browser: Browser) => Promise<void>;
 };
 
+function listInput(name: string, fallback: readonly string[]): string[] {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    return [...fallback];
+  }
+
+  const items = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (items.length === 0) {
+    throw new Error(`${name} must contain at least one comma-separated value`);
+  }
+
+  return items;
+}
+
 export const bookingInputs: ReservationInputs = {
-  courtHierarchy: ["4","8","9","3","2","6","1","5","10","7"],
+  courtHierarchy: listInput(
+    "PLAYBYPOINT_COURT_HIERARCHY",
+    ["4", "8", "9", "3", "2", "6", "1", "5", "10", "7"],
+  ),
   // desiredTimes: ["11:30-12pm"],
-  desiredTimes: ["7:30-8pm","8-8:30pm", "8:30-9pm", "9-9:30pm"],
+  desiredTimes: listInput(
+    "PLAYBYPOINT_DESIRED_TIMES",
+    ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"],
+  ),
   // desiredTimes: ['2-2:30pm','2:30-3pm','3-3:30pm','3:30-4pm'],
-  secondary: "philip pham",
+  secondary:
+    process.env.PLAYBYPOINT_SECONDARY?.trim() || "philip pham",
 };
 
 export const availableSteps: Record<string, BrowserWorkflowStep> = {

@@ -2,14 +2,64 @@ name: Android Chrome Main Workflow
 
 on:
   workflow_dispatch:
+    inputs:
+      run_1_desired_times:
+        description: "Run 1 desired times, comma-separated"
+        required: true
+        default: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
+        type: string
+      run_1_court_hierarchy:
+        description: "Run 1 court order, comma-separated"
+        required: true
+        default: "4,9,2,1,10"
+        type: string
+      run_1_secondary:
+        description: "Run 1 secondary player"
+        required: true
+        default: "philip pham"
+        type: string
+      run_2_desired_times:
+        description: "Run 2 desired times, comma-separated"
+        required: true
+        default: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
+        type: string
+      run_2_court_hierarchy:
+        description: "Run 2 court order, comma-separated"
+        required: true
+        default: "8,3,6,5,7"
+        type: string
+      run_2_secondary:
+        description: "Run 2 secondary player"
+        required: true
+        default: "philip pham"
+        type: string
 
 jobs:
   android-chrome-main:
+    name: Android Chrome Run ${{ matrix.run_id }}
     runs-on: ubuntu-22.04
 
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - run_id: 1
+            desired_times: ${{ inputs.run_1_desired_times }}
+            court_hierarchy: ${{ inputs.run_1_court_hierarchy }}
+            secondary: ${{ inputs.run_1_secondary }}
+          - run_id: 2
+            desired_times: ${{ inputs.run_2_desired_times }}
+            court_hierarchy: ${{ inputs.run_2_court_hierarchy }}
+            secondary: ${{ inputs.run_2_secondary }}
+
     env:
+      RUN_ID: ${{ matrix.run_id }}
       PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
       PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
+      PLAYBYPOINT_DESIRED_TIMES: ${{ matrix.desired_times }}
+      PLAYBYPOINT_COURT_HIERARCHY: ${{ matrix.court_hierarchy }}
+      PLAYBYPOINT_SECONDARY: ${{ matrix.secondary }}
       WDIO_LOG_LEVEL: error
       NPM_CONFIG_LOGLEVEL: error
       NODE_NO_WARNINGS: 1
@@ -64,14 +114,21 @@ jobs:
 
             sleep 5
 
-            bash -c 'set +e; (for second in $(seq 1 60); do CHROME_TASK_ID=$(adb shell dumpsys activity activities | grep -m1 "A=.*:com.android.chrome.*visible=true" | sed -E "s/.*#([0-9]+).*/\1/"); APP_SIZE=$(adb shell dumpsys window displays | grep -m1 "init=.* app=" | sed -E "s/.*app=([0-9]+x[0-9]+).*/\1/"); APP_WIDTH=$(echo "$APP_SIZE" | cut -d"x" -f1); APP_HEIGHT=$(echo "$APP_SIZE" | cut -d"x" -f2); if [ -n "$CHROME_TASK_ID" ] && [ -n "$APP_WIDTH" ] && [ -n "$APP_HEIGHT" ]; then if adb shell am task resize "$CHROME_TASK_ID" 0 0 "$APP_WIDTH" "$APP_HEIGHT"; then echo "Maximized Chrome task $CHROME_TASK_ID to ${APP_WIDTH}x${APP_HEIGHT}"; exit 0; fi; fi; sleep 1; done; echo "Chrome task was not maximized before the workflow ended"; exit 1) > maximize-chrome.log 2>&1 & maximize_pid=$!; adb shell screenrecord --size 1920x1080 --bit-rate 6000000 --time-limit 180 /sdcard/main-workflow.mp4 > screenrecord.log 2>&1 & screenrecord_pid=$!; printf "\n" | npx tsx src/browser/main.ts; workflow_status=$?; kill -TERM "$maximize_pid" 2>/dev/null || true; wait "$maximize_pid" 2>/dev/null || true; adb shell pkill -2 -x screenrecord >/dev/null 2>&1 || true; for second in 1 2 3 4 5; do kill -0 "$screenrecord_pid" 2>/dev/null || break; sleep 1; done; adb shell pkill -9 -x screenrecord >/dev/null 2>&1 || true; kill -TERM "$screenrecord_pid" 2>/dev/null || true; wait "$screenrecord_pid" 2>/dev/null || true; sleep 1; adb pull /sdcard/main-workflow.mp4 main-workflow.mp4 || true; exit "$workflow_status"'
+            bash -c 'set +e; (for second in $(seq 1 60); do CHROME_TASK_ID=$(adb shell dumpsys activity activities | grep -m1 "A=.*:com.android.chrome.*visible=true" | sed -E "s/.*#([0-9]+).*/\1/"); APP_SIZE=$(adb shell dumpsys window displays | grep -m1 "init=.* app=" | sed -E "s/.*app=([0-9]+x[0-9]+).*/\1/"); APP_WIDTH=$(echo "$APP_SIZE" | cut -d"x" -f1); APP_HEIGHT=$(echo "$APP_SIZE" | cut -d"x" -f2); if [ -n "$CHROME_TASK_ID" ] && [ -n "$APP_WIDTH" ] && [ -n "$APP_HEIGHT" ]; then if adb shell am task resize "$CHROME_TASK_ID" 0 0 "$APP_WIDTH" "$APP_HEIGHT"; then echo "Maximized Chrome task $CHROME_TASK_ID to ${APP_WIDTH}x${APP_HEIGHT}"; exit 0; fi; fi; sleep 1; done; echo "Chrome task was not maximized before the workflow ended"; exit 1) > maximize-chrome.log 2>&1 & maximize_pid=$!; adb shell screenrecord --size 1920x1080 --bit-rate 6000000 --time-limit 180 /sdcard/main-workflow.mp4 > screenrecord.log 2>&1 & screenrecord_pid=$!; printf "\n" | npx tsx src/browser/main.ts; workflow_status=$?; kill -TERM "$maximize_pid" 2>/dev/null || true; wait "$maximize_pid" 2>/dev/null || true; adb shell pkill -2 -x screenrecord >/dev/null 2>&1 || true; for second in 1 2 3 4 5; do kill -0 "$screenrecord_pid" 2>/dev/null || break; sleep 1; done; adb shell pkill -9 -x screenrecord >/dev/null 2>&1 || true; kill -TERM "$screenrecord_pid" 2>/dev/null || true; wait "$screenrecord_pid" 2>/dev/null || true; sleep 1; adb pull /sdcard/main-workflow.mp4 "main-workflow-${RUN_ID}.mp4" || true; exit "$workflow_status"'
+
+      - name: Prepare run screenshot
+        if: always()
+        run: |
+          if [ -f final-workflow.png ]; then
+            mv final-workflow.png "final-workflow-${RUN_ID}.png"
+          fi
 
       - name: Upload booking screenshot
         if: always()
         id: upload-screenshot
         uses: actions/upload-artifact@v7
         with:
-          path: final-workflow.png
+          path: final-workflow-${{ matrix.run_id }}.png
           archive: false
           if-no-files-found: ignore
 
@@ -92,7 +149,7 @@ jobs:
             -H "Authorization: Bearer $GH_TOKEN" \
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip")
 
-          echo "## Booking Workflow Screenshot" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Booking Workflow Screenshot — Run ${RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "![Booking workflow screenshot](${BLOB_URL})" >> "$GITHUB_STEP_SUMMARY"
 
@@ -101,7 +158,7 @@ jobs:
         id: upload-video
         uses: actions/upload-artifact@v7
         with:
-          path: main-workflow.mp4
+          path: main-workflow-${{ matrix.run_id }}.mp4
           archive: false
           if-no-files-found: ignore
 
@@ -116,7 +173,7 @@ jobs:
           fi
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "## Booking Workflow Video" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Booking Workflow Video — Run ${RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "[Watch or download the workflow recording]($VIDEO_URL)" >> "$GITHUB_STEP_SUMMARY"
 
@@ -124,7 +181,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: android-chrome-main-logs
+          name: android-chrome-main-logs-${{ matrix.run_id }}
           path: |
             appium.log
             emulator.log
