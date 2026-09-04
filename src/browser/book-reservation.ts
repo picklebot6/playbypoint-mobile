@@ -43,7 +43,7 @@ async function waitForTimer(
       }
 
       if (!timerIsVisible) {
-        await browser.pause(750);
+        await browser.pause(100);
         return true;
       }
 
@@ -249,7 +249,8 @@ export async function bookReservation(
   }
 
   if (!selectedCourt) {
-    throw new Error("None of the preferred courts could be clicked");
+    console.log("No preferred court was available. Completing the workflow without a reservation.");
+    return;
   }
 
   // next
@@ -316,6 +317,7 @@ export async function bookReservation(
 
     // reset alert text
     alertText = null;
+    selectedCourt = undefined;
 
     // select next available court
     for (const court of courtHierarchy) {
@@ -335,6 +337,11 @@ export async function bookReservation(
       } else {
         console.log(`Court ${court} not available`)
       }
+    }
+
+    if (!selectedCourt) {
+      console.log("No remaining preferred court was available. Completing the workflow without a reservation.");
+      return;
     }
 
     // book again
