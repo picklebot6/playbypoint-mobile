@@ -260,6 +260,8 @@ export async function bookReservation(
     bookingSelectors.nextCourt,
   );
 
+  await browser.pause(100);
+
   // Add user
   await clickXPathFast(
     browser,

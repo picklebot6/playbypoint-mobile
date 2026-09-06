@@ -141,8 +141,6 @@ export async function runBrowserWorkflow(
     return;
   }
 
-  // await pause();
-
   const browser = await remote(androidChromeOptions);
   let sessionCleanup: Promise<unknown> | undefined;
   let shuttingDown = false;
