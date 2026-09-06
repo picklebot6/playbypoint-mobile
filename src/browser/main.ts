@@ -91,8 +91,7 @@ export function configureForCurrentDay(): boolean {
   console.log(`Current day in ${timeZone}: ${day}`);
 
   if (day === "Sunday") {
-    // removeWeekendCourts();
-    bookingInputs.desiredTimes = ["2:30-3pm"]
+    removeWeekendCourts();
   } else if (day === "Monday") {
     // Add Monday-specific configuration here.
   } else if (day === "Tuesday") {
