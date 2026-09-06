@@ -64,6 +64,8 @@ export const bookingInputs: ReservationInputs = {
     "PLAYBYPOINT_DESIRED_TIMES",
     ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"],
   ),
+  primary:
+    process.env.PLAYBYPOINT_PRIMARY?.trim() || "",
   secondary:
     process.env.PLAYBYPOINT_SECONDARY?.trim() || "philip pham",
 };
@@ -80,6 +82,14 @@ function removeWeekendCourts() {
   );
 }
 
+function configureDesiredTimes(isWeekend: boolean) {
+  bookingInputs.desiredTimes = isWeekend
+    ? ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"]
+    : ["8-8:30pm", "8:30-9pm", "9-9:30pm", "9:30-10pm"];
+
+  console.log(`Desired times: ${bookingInputs.desiredTimes.join(", ")}`);
+}
+
 export function configureForCurrentDay(): boolean {
   const timeZone =
     process.env.PLAYBYPOINT_TIME_ZONE?.trim() || "America/Los_Angeles";
@@ -89,6 +99,7 @@ export function configureForCurrentDay(): boolean {
   }).format(new Date());
 
   console.log(`Current day in ${timeZone}: ${day}`);
+  configureDesiredTimes(day === "Saturday" || day === "Sunday");
 
   if (day === "Sunday") {
     removeWeekendCourts();
@@ -108,6 +119,11 @@ export function configureForCurrentDay(): boolean {
   } else if (day === "Saturday") {
     removeWeekendCourts();
   }
+
+  // override env inputs for testing
+  // bookingInputs.desiredTimes = ["2-2:30pm"];
+  // bookingInputs.primary = 'Paul Rodriguez';
+  // bookingInputs.secondary = 'Gil Navarro'
 
   return true;
 }

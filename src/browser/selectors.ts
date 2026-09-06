@@ -24,4 +24,5 @@ export const bookingSelectors = {
   hr,
   min,
   sec,
+  removePrimary: "//button[@title='Remove player']"
 } as const;

@@ -188,5 +188,5 @@ export async function navigateToBooking(browser: Browser) {
     "Next Week",
     getNextWeek(),
   );
-  await browser.pause(5_000);
+  await browser.pause(3000);
 }

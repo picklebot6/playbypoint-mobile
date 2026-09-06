@@ -15,13 +15,13 @@ jobs:
         include:
           - run_id: 1
             desired_times: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
-            # desired_times: "11:30-12pm"
             court_hierarchy: "4,9,2,1,10"
+            primary: ""
             secondary: "philip pham"
           - run_id: 2
             desired_times: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
-            # desired_times: "11:30-12pm"
             court_hierarchy: "8,3,6,5,7"
+            primary: ""
             secondary: "philip pham"
 
     env:
@@ -30,6 +30,7 @@ jobs:
       PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
       PLAYBYPOINT_DESIRED_TIMES: ${{ matrix.desired_times }}
       PLAYBYPOINT_COURT_HIERARCHY: ${{ matrix.court_hierarchy }}
+      PLAYBYPOINT_PRIMARY: $ {{matrix.primary}}
       PLAYBYPOINT_SECONDARY: ${{ matrix.secondary }}
       WDIO_LOG_LEVEL: error
       NPM_CONFIG_LOGLEVEL: error

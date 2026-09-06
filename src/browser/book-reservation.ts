@@ -1,10 +1,11 @@
 import type { Browser } from "webdriverio";
 import { bookingSelectors } from "./selectors";
-import { pause } from "./main";
+import { bookingInputs, pause } from "./main";
 
 export type ReservationInputs = {
   courtHierarchy: readonly string[];
   desiredTimes: readonly string[];
+  primary: string;
   secondary: string;
 };
 
@@ -166,7 +167,7 @@ async function clickXPathFast(
 
       const element = elements[0];
 
-      if (name == "Add Secondary") {
+      if (name == "Add Primary" || name == "Add Secondary") {
         await browser.pause(750);
       }
 
@@ -228,11 +229,12 @@ export async function bookReservation(
   browser: Browser,
   inputs: ReservationInputs,
 ) {
-  const { courtHierarchy, desiredTimes, secondary } = inputs;
+  const { courtHierarchy, desiredTimes, primary, secondary } = inputs;
 
   console.log("Loaded booking inputs:", {
     courtHierarchy,
     desiredTimes,
+    primary,
     secondary,
   });
 
@@ -293,6 +295,33 @@ export async function bookReservation(
     "Next",
     bookingSelectors.nextCourt,
   );
+
+  // If primary user is provided, add that person
+  if (bookingInputs.primary != "") {
+    // remove primary user
+    await clickXPathFast(
+      browser,
+      "Remove Primary",
+      bookingSelectors.removePrimary,
+    );
+
+    // Add user
+    await clickXPathFast(
+      browser,
+      "Add User",
+      bookingSelectors.addUser,
+    );
+
+    // Add secondary
+    await clickXPathFast(
+      browser,
+      "Add Primary",
+      secondaryPath(primary),
+    );
+    
+    // short pause to register user added
+    await browser.pause(750)
+  } 
 
   // Add user
   await clickXPathFast(
