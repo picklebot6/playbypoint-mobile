@@ -174,12 +174,46 @@ async function clickXPathFast(
         (el as HTMLElement).click();
       }, element);
 
+      if (name.includes("Court")) {
+        await browser.waitUntil(
+          async () => {
+            const currentElements = await browser.$$(xpath).getElements();
+
+            for (const currentElement of currentElements) {
+              if (!(await currentElement.isDisplayed())) {
+                continue;
+              }
+
+              const className = await currentElement.getAttribute("class");
+              const classes = String(className ?? "").split(/\s+/);
+
+              if (classes.includes("primary")) {
+                console.log("Court clicked verified")
+                return true;
+              }
+            }
+
+            return false;
+          },
+          {
+            timeout: 2_000,
+            interval: 50,
+            timeoutMsg: `${name} did not become selected`,
+          },
+        );
+      }
+
       console.log(`Fast Clicked ${name}`);
       return true;
     } catch (error) {
       console.log(`Fast Click attempt ${clickAttempt} failed`);
 
       if (clickAttempt === maxAttempts) {
+        if (name.includes("Court")) {
+          console.log(`${name} did not remain selected`);
+          return false;
+        }
+
         throw error;
       }
 
@@ -260,8 +294,6 @@ export async function bookReservation(
     bookingSelectors.nextCourt,
   );
 
-  await browser.pause(100);
-
   // Add user
   await clickXPathFast(
     browser,
@@ -329,7 +361,7 @@ export async function bookReservation(
       attemptedCourts.push(court)
       const clicked = await clickXPathFast(
         browser,
-        `Court ${court}`,
+        `Try again c: ${court}`,
         courtPath(court),
       );
 
