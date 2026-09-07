@@ -30,7 +30,7 @@ jobs:
       PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
       PLAYBYPOINT_DESIRED_TIMES: ${{ matrix.desired_times }}
       PLAYBYPOINT_COURT_HIERARCHY: ${{ matrix.court_hierarchy }}
-      PLAYBYPOINT_PRIMARY: $ {{matrix.primary}}
+      PLAYBYPOINT_PRIMARY: ${{ matrix.primary }}
       PLAYBYPOINT_SECONDARY: ${{ matrix.secondary }}
       WDIO_LOG_LEVEL: error
       NPM_CONFIG_LOGLEVEL: error

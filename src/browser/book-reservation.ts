@@ -263,6 +263,7 @@ export async function bookReservation(
       }
     }
   }
+  await browser.pause(500);
 
   // click courts
   let attemptedCourts = [];
@@ -343,6 +344,8 @@ export async function bookReservation(
     "Next",
     bookingSelectors.nextUser,
   );
+
+  return;
 
   // Book
   await clickXPathFast(
