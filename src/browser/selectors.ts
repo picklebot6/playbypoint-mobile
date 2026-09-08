@@ -10,6 +10,9 @@ export const sec = "(//div[contains(@class,'Countdown')]//td)[5]";
 
 export const bookingSelectors = {
   frame: "iframe[src*='greenfield.playbypoint.com']",
+  clubDropdown: "//button//div[contains(@class,'flex shrink')]",
+  cerritosSelected: "//button//span[contains(text(),'Cerritos')]",
+  iPickleCeritos: "//li[@role='button']/span[text()='iTennis/iPickle Cerritos']",
   bookNow: "//span[normalize-space()='Book Now']/ancestor::button[1]",
   reserveFullCourt: "//span[contains(text(),'Reserve a full court')]/ancestor::button",
   next: "//span[text()='Next']",

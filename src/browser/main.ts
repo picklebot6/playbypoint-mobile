@@ -8,11 +8,11 @@ import {
 import { logInToPlayByPoint } from "./login";
 import {
   navigateToBooking,
-  type NavigateToBookingInputs,
 } from "./navigate-to-booking";
 
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { execFile } from "node:child_process";
 import { bookReservation, ReservationInputs } from "./book-reservation";
 
 export async function pause(message = "Press Enter to continue...") {
@@ -35,6 +35,92 @@ type BrowserWorkflowStep = {
   name: string;
   run: (browser: Browser) => Promise<void>;
 };
+
+function runAdb(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "adb",
+      args,
+      {
+        encoding: "utf8",
+        maxBuffer: 10 * 1024 * 1024,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(
+            new Error(
+              `adb ${args.join(" ")} failed: ${stderr.trim() || error.message}`,
+            ),
+          );
+          return;
+        }
+
+        resolve(stdout);
+      },
+    );
+  });
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+export async function maximizeAndroidChromeWindow(
+  timeoutMs = 60_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastFailure = "Chrome is not visible yet";
+
+  while (Date.now() < deadline) {
+    try {
+      const [activities, displays] = await Promise.all([
+        runAdb(["shell", "dumpsys", "activity", "activities"]),
+        runAdb(["shell", "dumpsys", "window", "displays"]),
+      ]);
+
+      const chromeTaskLine = activities
+        .split("\n")
+        .find(
+          (line) =>
+            line.includes("com.android.chrome") &&
+            line.includes("visible=true"),
+        );
+      const taskId = chromeTaskLine?.match(/#(\d+)/)?.[1];
+      const appSize = displays.match(/\bapp=(\d+)x(\d+)/);
+
+      if (!taskId) {
+        lastFailure = "The visible Chrome task was not found";
+      } else if (!appSize) {
+        lastFailure = "The Android display app bounds were not found";
+      } else {
+        const [, width, height] = appSize;
+
+        await runAdb([
+          "shell",
+          "am",
+          "task",
+          "resize",
+          taskId,
+          "0",
+          "0",
+          width,
+          height,
+        ]);
+
+        console.log(`Chrome task ${taskId} maximized to ${width}x${height}`);
+        return;
+      }
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error);
+    }
+
+    await wait(1_000);
+  }
+
+  throw new Error(
+    `Chrome could not be maximized within ${timeoutMs / 1_000} seconds: ${lastFailure}`,
+  );
+}
 
 function listInput(name: string, fallback: readonly string[]): string[] {
   const value = process.env[name]?.trim();
@@ -192,8 +278,7 @@ export async function runBrowserWorkflow(
   process.on("SIGTERM", handleTermination);
 
   try {
-    await browser.maximizeWindow();
-    console.log("Chrome maximized");
+    await maximizeAndroidChromeWindow();
 
     for (const step of steps) {
       console.log(`Starting workflow step: ${step.name}`);

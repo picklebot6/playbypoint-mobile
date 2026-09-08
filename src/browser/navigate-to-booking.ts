@@ -2,30 +2,29 @@ import type { Browser } from "webdriverio";
 
 import { elementWaitMs } from "./config";
 import { bookingSelectors } from "./selectors";
+import { pause } from "./main";
 
-export type NavigateToBookingInputs = {
-  courtHierarchy: readonly string[];
-  desiredTimes: readonly string[];
-  secondary: string;
-};
 
 function getNextWeek(): string {
     const now = new Date();
     const pstNowString = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
     const pstNow = new Date(pstNowString);
     const sevenDaysLater = new Date(pstNow.getTime() + 7 * 24 * 60 * 60 * 1000);
-    let dayOfMonth = sevenDaysLater.getDate().toString().padStart(2, '0');
-    // temp
-    dayOfMonth="14";
-    return `//div[@class='day_number' and text()='${dayOfMonth}']`;
-}
+    const dayOfMonth = sevenDaysLater.getDate().toString().padStart(2, '0');
 
-function desiredTimePath(time: string) : string {
-    return `//button[text()='${time}' and not(contains(@class,'basic red'))]`
+    return `//div[@class='day_number' and text()='${dayOfMonth}']`;
 }
 
 function selectorIsConfigured(xpath: string) {
   return xpath.length > 0 && !xpath.startsWith("REPLACE_WITH_");
+}
+
+async function xpathExists(
+  browser: Browser,
+  xpath: string,
+): Promise<boolean> {
+  const elements = await browser.$$(xpath).getElements();
+  return elements.length > 0;
 }
 
 async function hasVisibleMatch(browser: Browser, xpath: string) {
@@ -107,47 +106,6 @@ async function clickXPath(
   throw new Error(`${name} was not found or clickable`);
 }
 
-async function clickXPathFast(
-  browser: Browser,
-  name: string,
-  xpath: string,
-) {
-  if (!selectorIsConfigured(xpath)) {
-    throw new Error(
-      `Define the XPath for ${name} in src/browser/selectors.ts`,
-    );
-  }
-
-  console.log(`Looking for ${name}...`);
-
-  const maximumAttempts = 2;
-  const attemptWaitMs = 10_000;
-
-  for (let attempt = 1; attempt <= maximumAttempts; attempt++) {
-    const elements = await browser.$$(xpath).getElements();
-    for await (const [index, element] of elements.entries()) {
-      const displayed = await element.isDisplayed();
-
-      console.log(
-        `${name} candidate ${index + 1} displayed: ${displayed}`,
-      );
-
-      if (!displayed) {
-        continue;
-      }
-
-      console.log(
-        `Fast clicking: ${name}`,
-      );
-
-      await element.click();
-        await browser.pause(50);
-        console.log(`Clicked visible ${name} candidate ${index + 1}`);
-        return;
-    }
-  }
-}
-
 export async function navigateToBooking(browser: Browser) {
   await browser.switchFrame(null);
 
@@ -160,6 +118,26 @@ export async function navigateToBooking(browser: Browser) {
 
   await browser.switchFrame(bookingFrame);
   console.log("Switched into booking iframe");
+
+  if (await xpathExists(browser, bookingSelectors.cerritosSelected) == false) {
+    console.log("iPickle Cerritos needs to be selected");
+
+    await clickXPath(
+      browser,
+      "Club Dropdown",
+      bookingSelectors.clubDropdown,
+    );
+
+    await clickXPath(
+      browser,
+      "iPickle Cerritos",
+      bookingSelectors.iPickleCeritos,
+    );
+
+    await browser.pause(2000);
+  } else {
+    console.log("iPickle Cerritos already selected");
+  };
 
   await clickXPath(
     browser,
