@@ -168,7 +168,7 @@ async function clickXPathFast(
       const element = elements[0];
 
       if (name == "Add Primary" || name == "Add Secondary") {
-        await browser.pause(750);
+        await browser.pause(500);
       }
 
       await browser.execute((el) => {
@@ -321,7 +321,7 @@ export async function bookReservation(
     );
     
     // short pause to register user added
-    await browser.pause(750)
+    await browser.pause(500)
   } 
 
   // Add user
@@ -344,6 +344,7 @@ export async function bookReservation(
     "Next",
     bookingSelectors.nextUser,
   );
+
 
   // Book
   await clickXPathFast(

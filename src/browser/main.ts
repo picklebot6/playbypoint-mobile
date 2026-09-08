@@ -121,9 +121,9 @@ export function configureForCurrentDay(): boolean {
   }
 
   // override env inputs for testing
-  // bookingInputs.desiredTimes = ["2-2:30pm"];
-  // bookingInputs.primary = 'Paul Rodriguez';
-  // bookingInputs.secondary = 'Gil Navarro'
+  bookingInputs.desiredTimes = ["2-2:30pm"];
+  bookingInputs.primary = 'Yena Kim';
+  bookingInputs.secondary = 'Matt Lim'
 
   return true;
 }
