@@ -14,7 +14,9 @@ function getNextWeek(): string {
     const pstNowString = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
     const pstNow = new Date(pstNowString);
     const sevenDaysLater = new Date(pstNow.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const dayOfMonth = sevenDaysLater.getDate().toString().padStart(2, '0');
+    let dayOfMonth = sevenDaysLater.getDate().toString().padStart(2, '0');
+    // temp
+    dayOfMonth="14";
     return `//div[@class='day_number' and text()='${dayOfMonth}']`;
 }
 

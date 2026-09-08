@@ -344,8 +344,7 @@ export async function bookReservation(
     "Next",
     bookingSelectors.nextUser,
   );
-
-
+  
   // Book
   await clickXPathFast(
     browser,
