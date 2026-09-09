@@ -153,66 +153,18 @@ export const bookingInputs: ReservationInputs = {
   primary:
     process.env.PLAYBYPOINT_PRIMARY?.trim() || "",
   secondary:
-    process.env.PLAYBYPOINT_SECONDARY?.trim() || "philip pham",
+    process.env.PLAYBYPOINT_SECONDARY?.trim() || "Matt Lim",
+  day: process.env.PLAYBYPOINT_DAY?.trim() || undefined,
 };
 
-function removeWeekendCourts() {
-  const excludedCourts = new Set(["6", "7", "8", "9", "10"]);
-
-  bookingInputs.courtHierarchy = bookingInputs.courtHierarchy.filter(
-    (court) => !excludedCourts.has(court),
-  );
-
-  console.log(
-    `Weekend court hierarchy: ${bookingInputs.courtHierarchy.join(", ")}`,
-  );
-}
-
-function configureDesiredTimes(isWeekend: boolean) {
-  bookingInputs.desiredTimes = isWeekend
-    ? ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"]
-    : ["8-8:30pm", "8:30-9pm", "9-9:30pm", "9:30-10pm"];
-
-  console.log(`Desired times: ${bookingInputs.desiredTimes.join(", ")}`);
-}
-
-export function configureForCurrentDay(): boolean {
-  const timeZone =
-    process.env.PLAYBYPOINT_TIME_ZONE?.trim() || "America/Los_Angeles";
-  const day = new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    timeZone,
-  }).format(new Date());
-
-  console.log(`Current day in ${timeZone}: ${day}`);
-  configureDesiredTimes(day === "Saturday" || day === "Sunday");
-
-  if (day === "Sunday") {
-    removeWeekendCourts();
-  } else if (day === "Monday") {
-    // Add Monday-specific configuration here.
-  } else if (day === "Tuesday") {
-    // Add Tuesday-specific configuration here.
-  } else if (day === "Wednesday") {
-    // Add Wednesday-specific configuration here.
-    console.log("It's Wednesday. Finishing the workflow without performing any actions.");
-    return false;
-  } else if (day === "Thursday") {
-    // Add Thursday-specific configuration here.
-  } else if (day === "Friday") {
-    console.log("It's Friday. Finishing the workflow without performing any actions.");
-    return false;
-  } else if (day === "Saturday") {
-    removeWeekendCourts();
-  }
-
-  // override env inputs for testing
-  bookingInputs.desiredTimes = ["2-2:30pm"];
-  bookingInputs.primary = 'Yena Kim';
-  bookingInputs.secondary = 'Matt Lim'
-
-  return true;
-}
+// for override if necessary
+// export const bookingInputs: ReservationInputs = {
+//   courtHierarchy: ["4", "8", "9"],
+//   desiredTimes: ["7:30-8pm", "8-8:30pm"],
+//   primary: "Yena Kim",
+//   secondary: "E K",
+//   day: "Wednesday",
+// };
 
 export const availableSteps: Record<string, BrowserWorkflowStep> = {
   login: {
@@ -239,10 +191,6 @@ export const workflowSteps: BrowserWorkflowStep[] = [
 export async function runBrowserWorkflow(
   steps: BrowserWorkflowStep[] = workflowSteps,
 ) {
-  if (!configureForCurrentDay()) {
-    return;
-  }
-
   const browser = await remote(androidChromeOptions);
   let sessionCleanup: Promise<unknown> | undefined;
   let shuttingDown = false;

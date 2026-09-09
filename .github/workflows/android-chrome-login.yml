@@ -2,27 +2,75 @@ name: Android Chrome Main Workflow
 
 on:
   workflow_dispatch:
+    inputs:
+      day:
+        description: Day override (leave blank to use the current day)
+        required: false
+        default: ""
+        type: choice
+        options:
+          - ""
+          - Monday
+          - Tuesday
+          - Wednesday
+          - Thursday
+          - Friday
+          - Saturday
+          - Sunday
 
 jobs:
+  select-runs:
+    name: Select runs for current day
+    runs-on: ubuntu-latest
+
+    outputs:
+      matrix: ${{ steps.schedule.outputs.matrix }}
+      should_run: ${{ steps.schedule.outputs.should_run }}
+      day: ${{ steps.schedule.outputs.day }}
+
+    steps:
+      - name: Build daily run matrix
+        id: schedule
+        shell: bash
+        env:
+          SELECTED_DAY: ${{ inputs.day }}
+        run: |
+          if [[ -n "$SELECTED_DAY" ]]; then
+            day="$SELECTED_DAY"
+            echo "Using selected day override: $day"
+          else
+            day=$(TZ=America/Los_Angeles date +%A)
+            echo "Current day in America/Los_Angeles: $day"
+          fi
+
+          should_run=true
+
+          if [[ "$day" == "Monday" || "$day" == "Tuesday" || "$day" == "Thursday" ]]; then
+            matrix='{"include":[{"run_id":"paul-dexter-a","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"4,2,6,1,7","primary":"Paul Rodriguez","secondary":"Dexter Dizon"},{"run_id":"paul-dexter-b","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"9,8,3,10,5","primary":"Paul Rodriguez","secondary":"Dexter Dizon"}]}'
+          elif [[ "$day" == "Wednesday" ]]; then
+            matrix='{"include":[{"run_id":"yena-ek-7-9-a","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"2,9,8,6,5","primary":"","secondary":"E K"},{"run_id":"yena-ek-7-9-b","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"4,3,1,10,7","primary":"","secondary":"E K"},{"run_id":"derek-lia-9-10-a","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"2,9,8,6,5","primary":"Derek Dang","secondary":"Lia Barnes"},{"run_id":"derek-lia-9-10-b","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"4,3,1,10,7","primary":"Derek Dang","secondary":"Lia Barnes"}]}'
+          elif [[ "$day" == "Saturday" || "$day" == "Sunday" ]]; then
+            matrix='{"include":[{"run_id":"yena-harrison-7-9-a","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"4,3,5","primary":"","secondary":"Harrison Yang"},{"run_id":"yena-harrison-7-9-b","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"2,1","primary":"","secondary":"Harrison Yang"},{"run_id":"ek-charlee-9-10-a","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"4,3,5","primary":"E K","secondary":"Charlee Liu"},{"run_id":"ek-charlee-9-10-b","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"2,1","primary":"E K","secondary":"Charlee Liu"}]}'
+          else
+            should_run=false
+            matrix='{"include":[{"run_id":"none","desired_times":"","court_hierarchy":"","primary":"","secondary":""}]}'
+            echo "No booking runs are configured for $day"
+          fi
+
+          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "day=$day" >> "$GITHUB_OUTPUT"
+
   android-chrome-main:
     name: Android Chrome Run ${{ matrix.run_id }}
+    needs: select-runs
+    if: ${{ needs.select-runs.outputs.should_run == 'true' }}
     runs-on: ubuntu-22.04
 
     strategy:
       fail-fast: false
-      max-parallel: 2
-      matrix:
-        include:
-          - run_id: 1
-            desired_times: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
-            court_hierarchy: "4,9,2,1,10"
-            primary: ""
-            secondary: "philip pham"
-          - run_id: 2
-            desired_times: "7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm"
-            court_hierarchy: "8,3,6,5,7"
-            primary: ""
-            secondary: "philip pham"
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.select-runs.outputs.matrix) }}
 
     env:
       RUN_ID: ${{ matrix.run_id }}
@@ -32,6 +80,7 @@ jobs:
       PLAYBYPOINT_COURT_HIERARCHY: ${{ matrix.court_hierarchy }}
       PLAYBYPOINT_PRIMARY: ${{ matrix.primary }}
       PLAYBYPOINT_SECONDARY: ${{ matrix.secondary }}
+      PLAYBYPOINT_DAY: ${{ needs.select-runs.outputs.day }}
       WDIO_LOG_LEVEL: error
       NPM_CONFIG_LOGLEVEL: error
       NODE_NO_WARNINGS: 1

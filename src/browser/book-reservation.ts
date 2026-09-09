@@ -7,6 +7,7 @@ export type ReservationInputs = {
   desiredTimes: readonly string[];
   primary: string;
   secondary: string;
+  day?: string;
 };
 
 function desiredTimePath(time: string) : string {
@@ -229,13 +230,14 @@ export async function bookReservation(
   browser: Browser,
   inputs: ReservationInputs,
 ) {
-  const { courtHierarchy, desiredTimes, primary, secondary } = inputs;
+  const { courtHierarchy, desiredTimes, primary, secondary, day } = inputs;
 
   console.log("Loaded booking inputs:", {
     courtHierarchy,
     desiredTimes,
     primary,
     secondary,
+    day,
   });
 
   console.log("Continuing in the existing booking iframe");
