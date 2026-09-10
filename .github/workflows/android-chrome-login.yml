@@ -54,7 +54,7 @@ jobs:
           book_at_epoch_ms=""
 
           if [[ "$FIVE_RUN_TEST" == "true" ]]; then
-            book_at_epoch_ms=$(( $(date +%s%3N) + 240000 ))
+            book_at_epoch_ms=$(( $(date +%s%3N) + 300000 ))
             matrix='{"include":[{"run_id":"8-830am-Court-2","desired_times":"8-8:30am","court_hierarchy":"2,6","primary":"","secondary":"Yena Kim"},{"run_id":"8-830am-Court-4","desired_times":"8-8:30am","court_hierarchy":"4,1","primary":"","secondary":"Yena Kim"},{"run_id":"8-830am-Court-8","desired_times":"8-8:30am","court_hierarchy":"8,5","primary":"","secondary":"Yena Kim"},{"run_id":"8-830am-Court-9","desired_times":"8-8:30am","court_hierarchy":"9,10","primary":"","secondary":"Yena Kim"},{"run_id":"8-830am-Court-3","desired_times":"8-8:30am","court_hierarchy":"3,7","primary":"","secondary":"Yena Kim"}]}'
             echo "Five-run synchronized test will release at epoch ${book_at_epoch_ms}ms"
           elif [[ "$day" == "Monday" || "$day" == "Tuesday" || "$day" == "Thursday" ]]; then

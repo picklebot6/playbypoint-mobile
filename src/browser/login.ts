@@ -130,15 +130,37 @@ export async function logInToPlayByPoint(browser: Browser) {
     loginSelectors.signIn,
   );
 
-  await browser.waitUntil(
-    () => bookNowIsVisible(browser),
-    {
-      timeout: 15_000,
-      interval: 500,
-      timeoutMsg: "Book Now button was not visible within 15 seconds after login",
-    },
-  );
+  let bookNowVisible = false;
+
+  try {
+    await browser.waitUntil(
+      async () => {
+        bookNowVisible = await bookNowIsVisible(browser);
+        return bookNowVisible;
+      },
+      {
+        timeout: 30_000,
+        interval: 500,
+        timeoutMsg: "Book Now button was not visible within 30 seconds after login",
+      },
+    );
+  } catch {
+    const currentUrl = await browser.getUrl();
+
+    if (currentUrl.includes("/users/sign_in")) {
+      throw new Error(
+        "Login did not complete within 30 seconds and the browser is still on the sign-in page",
+      );
+    }
+
+    console.log(
+      "Login completed, but Book Now was not visible within 30 seconds. Continuing to the navigation retry.",
+    );
+  }
 
   console.log("URL after login:", await browser.getUrl());
-  console.log("Login completed. Book Now button is visible.");
+
+  if (bookNowVisible) {
+    console.log("Login completed. Book Now button is visible.");
+  }
 }
