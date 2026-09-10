@@ -212,9 +212,24 @@ async function clickXPathFast(
         await browser.pause(500);
       }
 
+      const bookClickStartedAt = name === "Book" ? Date.now() : undefined;
+
+      if (bookClickStartedAt !== undefined) {
+        console.log(
+          `Book click dispatch started: ${new Date(bookClickStartedAt).toISOString()} (${bookClickStartedAt})`,
+        );
+      }
+
       await browser.execute((el) => {
         (el as HTMLElement).click();
       }, element);
+
+      if (bookClickStartedAt !== undefined) {
+        const bookClickCompletedAt = Date.now();
+        console.log(
+          `Book click dispatch completed: ${new Date(bookClickCompletedAt).toISOString()} (${bookClickCompletedAt}); duration=${bookClickCompletedAt - bookClickStartedAt}ms`,
+        );
+      }
 
       if (name.includes("Court")) {
         await browser.waitUntil(
