@@ -3,7 +3,6 @@ import type { Browser } from "webdriverio";
 import {
   elementWaitMs,
   loginUrl,
-  loginWaitMs,
 } from "./config";
 
 import {
@@ -68,6 +67,34 @@ async function clickSelector(
   console.log(`Clicked ${name}`);
 }
 
+async function bookNowIsVisible(browser: Browser): Promise<boolean> {
+  await browser.switchFrame(null);
+
+  const bookingFrames = await browser.$$(bookingSelectors.frame).getElements();
+
+  for (const bookingFrame of bookingFrames) {
+    try {
+      await browser.switchFrame(bookingFrame);
+
+      const bookNowButtons = await browser
+        .$$(bookingSelectors.bookNow)
+        .getElements();
+
+      for (const bookNowButton of bookNowButtons) {
+        if (await bookNowButton.isDisplayed()) {
+          return true;
+        }
+      }
+    } catch {
+      // The iframe may be replaced while the post-login page is loading.
+    } finally {
+      await browser.switchFrame(null);
+    }
+  }
+
+  return false;
+}
+
 export async function logInToPlayByPoint(browser: Browser) {
   const email = process.env.PLAYBYPOINT_EMAIL ?? "";
   const password = process.env.PLAYBYPOINT_PASSWORD ?? "";
@@ -103,25 +130,15 @@ export async function logInToPlayByPoint(browser: Browser) {
     loginSelectors.signIn,
   );
 
-  await browser.pause(5_000);
-
   await browser.waitUntil(
-    async () => !(await browser.getUrl()).includes("/users/sign_in"),
+    () => bookNowIsVisible(browser),
     {
-      timeout: loginWaitMs,
-      interval: 5000,
-      timeoutMsg: "Sign in click did not leave the login page",
+      timeout: 15_000,
+      interval: 500,
+      timeoutMsg: "Book Now button was not visible within 15 seconds after login",
     },
   );
 
   console.log("URL after login:", await browser.getUrl());
-
-  const bookingFrame = await browser.$(bookingSelectors.frame).getElement();
-
-  await bookingFrame.waitForExist({
-    timeout: elementWaitMs,
-    timeoutMsg: "Booking iframe did not appear after login",
-  });
-
-  console.log("Login completed. Booking iframe is available.");
+  console.log("Login completed. Book Now button is visible.");
 }
