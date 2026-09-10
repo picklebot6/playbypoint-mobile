@@ -141,6 +141,22 @@ function listInput(name: string, fallback: readonly string[]): string[] {
   return items;
 }
 
+function optionalEpochMillisecondsInput(name: string): number | undefined {
+  const rawValue = process.env[name]?.trim();
+
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const value = Number(rawValue);
+
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive epoch timestamp in milliseconds`);
+  }
+
+  return value;
+}
+
 export const bookingInputs: ReservationInputs = {
   courtHierarchy: listInput(
     "PLAYBYPOINT_COURT_HIERARCHY",
@@ -155,6 +171,9 @@ export const bookingInputs: ReservationInputs = {
   secondary:
     process.env.PLAYBYPOINT_SECONDARY?.trim() || "Matt Lim",
   day: process.env.PLAYBYPOINT_DAY?.trim() || undefined,
+  bookAtEpochMs: optionalEpochMillisecondsInput(
+    "PLAYBYPOINT_BOOK_AT_EPOCH_MS",
+  ),
 };
 
 // for override if necessary

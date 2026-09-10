@@ -17,6 +17,11 @@ on:
           - Friday
           - Saturday
           - Sunday
+      five_run_test:
+        description: Run the five synchronized booking tests
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   select-runs:
@@ -27,6 +32,7 @@ jobs:
       matrix: ${{ steps.schedule.outputs.matrix }}
       should_run: ${{ steps.schedule.outputs.should_run }}
       day: ${{ steps.schedule.outputs.day }}
+      book_at_epoch_ms: ${{ steps.schedule.outputs.book_at_epoch_ms }}
 
     steps:
       - name: Build daily run matrix
@@ -34,6 +40,7 @@ jobs:
         shell: bash
         env:
           SELECTED_DAY: ${{ inputs.day }}
+          FIVE_RUN_TEST: ${{ inputs.five_run_test }}
         run: |
           if [[ -n "$SELECTED_DAY" ]]; then
             day="$SELECTED_DAY"
@@ -44,8 +51,13 @@ jobs:
           fi
 
           should_run=true
+          book_at_epoch_ms=""
 
-          if [[ "$day" == "Monday" || "$day" == "Tuesday" || "$day" == "Thursday" ]]; then
+          if [[ "$FIVE_RUN_TEST" == "true" ]]; then
+            book_at_epoch_ms=$(( $(date +%s%3N) + 240000 ))
+            matrix='{"include":[{"run_id":"sync-test-1","desired_times":"8-8:30am","court_hierarchy":"2,6","primary":"","secondary":"philip pham"},{"run_id":"sync-test-2","desired_times":"8-8:30am","court_hierarchy":"4,1","primary":"","secondary":"philip pham"},{"run_id":"sync-test-3","desired_times":"8-8:30am","court_hierarchy":"8,5","primary":"","secondary":"philip pham"},{"run_id":"sync-test-4","desired_times":"8-8:30am","court_hierarchy":"9,10","primary":"","secondary":"philip pham"},{"run_id":"sync-test-5","desired_times":"8-8:30am","court_hierarchy":"3,7","primary":"","secondary":"philip pham"}]}'
+            echo "Five-run synchronized test will release at epoch ${book_at_epoch_ms}ms"
+          elif [[ "$day" == "Monday" || "$day" == "Tuesday" || "$day" == "Thursday" ]]; then
             matrix='{"include":[{"run_id":"paul-dexter-a","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"4,2,6,1,7","primary":"Paul Rodriguez","secondary":"Dexter Dizon"},{"run_id":"paul-dexter-b","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"9,8,3,10,5","primary":"Paul Rodriguez","secondary":"Dexter Dizon"}]}'
           elif [[ "$day" == "Wednesday" ]]; then
             matrix='{"include":[{"run_id":"yena-ek-7-9-a","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"2,9,8,6,5","primary":"","secondary":"E K"},{"run_id":"yena-ek-7-9-b","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"4,3,1,10,7","primary":"","secondary":"E K"},{"run_id":"derek-lia-9-10-a","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"2,9,8,6,5","primary":"Derek Dang","secondary":"Lia Barnes"},{"run_id":"derek-lia-9-10-b","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"4,3,1,10,7","primary":"Derek Dang","secondary":"Lia Barnes"}]}'
@@ -60,6 +72,7 @@ jobs:
           echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
           echo "day=$day" >> "$GITHUB_OUTPUT"
+          echo "book_at_epoch_ms=$book_at_epoch_ms" >> "$GITHUB_OUTPUT"
 
   android-chrome-main:
     name: Android Chrome Run ${{ matrix.run_id }}
@@ -69,7 +82,7 @@ jobs:
 
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 5
       matrix: ${{ fromJSON(needs.select-runs.outputs.matrix) }}
 
     env:
@@ -81,6 +94,7 @@ jobs:
       PLAYBYPOINT_PRIMARY: ${{ matrix.primary }}
       PLAYBYPOINT_SECONDARY: ${{ matrix.secondary }}
       PLAYBYPOINT_DAY: ${{ needs.select-runs.outputs.day }}
+      PLAYBYPOINT_BOOK_AT_EPOCH_MS: ${{ needs.select-runs.outputs.book_at_epoch_ms }}
       WDIO_LOG_LEVEL: error
       NPM_CONFIG_LOGLEVEL: error
       NODE_NO_WARNINGS: 1

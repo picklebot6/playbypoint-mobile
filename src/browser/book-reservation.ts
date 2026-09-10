@@ -8,7 +8,47 @@ export type ReservationInputs = {
   primary: string;
   secondary: string;
   day?: string;
+  bookAtEpochMs?: number;
 };
+
+async function waitForSynchronizedBookTime(
+  browser: Browser,
+  bookAtEpochMs?: number,
+): Promise<void> {
+  if (bookAtEpochMs === undefined) {
+    return;
+  }
+
+  if (Date.now() >= bookAtEpochMs) {
+    throw new Error(
+      `Synchronized Book release ${new Date(bookAtEpochMs).toISOString()} was reached before this run was ready`,
+    );
+  }
+
+  console.log(
+    `Ready to book. Waiting for synchronized release at ${new Date(bookAtEpochMs).toISOString()}`,
+  );
+
+  let lastLoggedSecond = -1;
+
+  while (true) {
+    const remainingMs = bookAtEpochMs - Date.now();
+
+    if (remainingMs <= 0) {
+      break;
+    }
+
+    const remainingSeconds = Math.ceil(remainingMs / 1_000);
+    if (remainingSeconds !== lastLoggedSecond) {
+      console.log(`Synchronized Book click in ${remainingSeconds}s`);
+      lastLoggedSecond = remainingSeconds;
+    }
+
+    await browser.pause(Math.min(250, remainingMs));
+  }
+
+  console.log("Synchronized Book click released");
+}
 
 function desiredTimePath(time: string) : string {
     return `//button[text()='${time}' and not(contains(@class,'basic red'))]`
@@ -230,7 +270,14 @@ export async function bookReservation(
   browser: Browser,
   inputs: ReservationInputs,
 ) {
-  const { courtHierarchy, desiredTimes, primary, secondary, day } = inputs;
+  const {
+    courtHierarchy,
+    desiredTimes,
+    primary,
+    secondary,
+    day,
+    bookAtEpochMs,
+  } = inputs;
 
   console.log("Loaded booking inputs:", {
     courtHierarchy,
@@ -238,6 +285,7 @@ export async function bookReservation(
     primary,
     secondary,
     day,
+    bookAtEpochMs,
   });
 
   console.log("Continuing in the existing booking iframe");
@@ -346,7 +394,9 @@ export async function bookReservation(
     "Next",
     bookingSelectors.nextUser,
   );
-  
+
+  await waitForSynchronizedBookTime(browser, bookAtEpochMs);
+
   // Book
   await clickXPathFast(
     browser,
