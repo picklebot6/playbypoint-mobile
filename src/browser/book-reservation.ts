@@ -132,6 +132,13 @@ async function getAlertText(browser: Browser) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      if (!(await browser.isAlertOpen())) {
+        if (attempt < maxAttempts) {
+          await browser.pause(500);
+        }
+        continue;
+      }
+
       const alertText = await browser.getAlertText();
 
       console.log("Alert text:", alertText);
@@ -428,7 +435,9 @@ async function beginPostResponseCapture(browser: Browser): Promise<void> {
   });
 }
 
-async function logCapturedPostResponses(browser: Browser): Promise<void> {
+async function logCapturedPostResponses(
+  browser: Browser,
+): Promise<CapturedPostResponse[]> {
   try {
     await browser.waitUntil(
       async () =>
@@ -482,6 +491,55 @@ async function logCapturedPostResponses(browser: Browser): Promise<void> {
     );
     console.log(`Book POST ${index + 1} raw response: ${response.body}`);
   }
+
+  return responses;
+}
+
+function bookingApiFailure(
+  responses: CapturedPostResponse[],
+): string | null {
+  const bookingResponse = responses.find((response) =>
+    response.url.includes("/booking_player"),
+  );
+
+  if (
+    !bookingResponse ||
+    (bookingResponse.status >= 200 && bookingResponse.status < 300)
+  ) {
+    return null;
+  }
+
+  try {
+    const body = JSON.parse(bookingResponse.body) as {
+      errors?: unknown;
+      error?: unknown;
+      message?: unknown;
+    };
+
+    if (Array.isArray(body.errors)) {
+      return body.errors.map(String).join("\n");
+    }
+
+    if (typeof body.errors === "string") {
+      return body.errors;
+    }
+
+    if (typeof body.error === "string") {
+      return body.error;
+    }
+
+    if (typeof body.message === "string") {
+      return body.message;
+    }
+  } catch {
+    // Fall through to the raw response/status description.
+  }
+
+  if (bookingResponse.body.trim()) {
+    return bookingResponse.body;
+  }
+
+  return `Booking API returned status ${bookingResponse.status} ${bookingResponse.statusText}`.trim();
 }
 
 async function clickBookAndCaptureResponses(
@@ -489,8 +547,16 @@ async function clickBookAndCaptureResponses(
 ): Promise<string | null> {
   await beginPostResponseCapture(browser);
   await clickXPathFast(browser, "Book", bookingSelectors.book);
-  await logCapturedPostResponses(browser);
-  return getAlertText(browser);
+  const responses = await logCapturedPostResponses(browser);
+  const apiFailure = bookingApiFailure(responses);
+  const alertText = await getAlertText(browser);
+
+  if (apiFailure !== null) {
+    console.log(`Booking API error: ${apiFailure}`);
+    return apiFailure;
+  }
+
+  return alertText;
 }
 
 export async function bookReservation(
@@ -632,6 +698,7 @@ export async function bookReservation(
       alertText !== null &&
       alertText.includes("Too many requests")
     ) {
+      return
       await browser.pause(10_000);
 
       alertText = await clickBookAndCaptureResponses(browser);
