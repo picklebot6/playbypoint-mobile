@@ -281,6 +281,218 @@ async function clickXPathFast(
   return false;
 }
 
+type CapturedPostResponse = {
+  transport: "fetch" | "xhr";
+  url: string;
+  status: number;
+  statusText: string;
+  body: string;
+};
+
+async function beginPostResponseCapture(browser: Browser): Promise<void> {
+  await browser.execute(() => {
+    type CaptureState = {
+      pending: number;
+      responses: CapturedPostResponse[];
+    };
+
+    type CaptureWindow = typeof window & {
+      __playByPointPostCapture?: CaptureState;
+      __playByPointPostCaptureInstalled?: boolean;
+    };
+
+    type CapturedXhr = XMLHttpRequest & {
+      __playByPointMethod?: string;
+      __playByPointUrl?: string;
+    };
+
+    const captureWindow = window as CaptureWindow;
+    const state = captureWindow.__playByPointPostCapture ?? {
+      pending: 0,
+      responses: [],
+    };
+
+    state.pending = 0;
+    state.responses = [];
+    captureWindow.__playByPointPostCapture = state;
+
+    if (captureWindow.__playByPointPostCaptureInstalled) {
+      return;
+    }
+
+    captureWindow.__playByPointPostCaptureInstalled = true;
+
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+      const [input, init] = args;
+      const method = String(
+        init?.method ?? (input instanceof Request ? input.method : "GET"),
+      ).toUpperCase();
+      const url = String(input instanceof Request ? input.url : input);
+
+      if (method !== "POST") {
+        return originalFetch(...args);
+      }
+
+      state.pending += 1;
+
+      try {
+        const response = await originalFetch(...args);
+        const body = await response.clone().text();
+
+        state.responses.push({
+          transport: "fetch",
+          url: response.url || url,
+          status: response.status,
+          statusText: response.statusText,
+          body,
+        });
+
+        return response;
+      } catch (error) {
+        state.responses.push({
+          transport: "fetch",
+          url,
+          status: 0,
+          statusText: "Fetch failed",
+          body: JSON.stringify({
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        });
+        throw error;
+      } finally {
+        state.pending -= 1;
+      }
+    };
+
+    const originalOpen = XMLHttpRequest.prototype.open;
+    const originalSend = XMLHttpRequest.prototype.send;
+
+    XMLHttpRequest.prototype.open = function (
+      method: string,
+      url: string | URL,
+      async: boolean = true,
+      username?: string | null,
+      password?: string | null,
+    ) {
+      const request = this as CapturedXhr;
+      request.__playByPointMethod = String(method).toUpperCase();
+      request.__playByPointUrl = String(url);
+
+      return originalOpen.call(
+        this,
+        method,
+        url,
+        async,
+        username,
+        password,
+      );
+    };
+
+    XMLHttpRequest.prototype.send = function (
+      body?: Document | XMLHttpRequestBodyInit | null,
+    ) {
+      const request = this as CapturedXhr;
+
+      if (request.__playByPointMethod === "POST") {
+        state.pending += 1;
+
+        this.addEventListener(
+          "loadend",
+          () => {
+            let responseBody = "";
+
+            try {
+              responseBody = this.responseText;
+            } catch (error) {
+              responseBody = JSON.stringify({
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+
+            state.responses.push({
+              transport: "xhr",
+              url: this.responseURL || request.__playByPointUrl || "",
+              status: this.status,
+              statusText: this.statusText,
+              body: responseBody,
+            });
+            state.pending -= 1;
+          },
+          { once: true },
+        );
+      }
+
+      return originalSend.call(this, body);
+    };
+  });
+}
+
+async function logCapturedPostResponses(browser: Browser): Promise<void> {
+  try {
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => {
+          const state = (
+            window as typeof window & {
+              __playByPointPostCapture?: {
+                pending: number;
+                responses: CapturedPostResponse[];
+              };
+            }
+          ).__playByPointPostCapture;
+
+          return Boolean(
+            state && state.pending === 0 && state.responses.length > 0,
+          );
+        }),
+      {
+        timeout: 10_000,
+        interval: 100,
+        timeoutMsg: "No completed POST response was captured after Book click",
+      },
+    );
+  } catch {
+    console.log("No completed fetch/XHR POST response captured after Book click");
+  }
+
+  const responses = await browser.execute(() => {
+    const state = (
+      window as typeof window & {
+        __playByPointPostCapture?: {
+          pending: number;
+          responses: CapturedPostResponse[];
+        };
+      }
+    ).__playByPointPostCapture;
+
+    if (!state) {
+      return [];
+    }
+
+    return state.responses.splice(0, state.responses.length);
+  });
+
+  for (const [index, response] of responses.entries()) {
+    console.log(
+      `Book POST ${index + 1}: ${response.transport.toUpperCase()} ${response.url}`,
+    );
+    console.log(
+      `Book POST ${index + 1} status: ${response.status} ${response.statusText}`.trim(),
+    );
+    console.log(`Book POST ${index + 1} raw response: ${response.body}`);
+  }
+}
+
+async function clickBookAndCaptureResponses(
+  browser: Browser,
+): Promise<string | null> {
+  await beginPostResponseCapture(browser);
+  await clickXPathFast(browser, "Book", bookingSelectors.book);
+  await logCapturedPostResponses(browser);
+  return getAlertText(browser);
+}
+
 export async function bookReservation(
   browser: Browser,
   inputs: ReservationInputs,
@@ -413,13 +625,7 @@ export async function bookReservation(
   await waitForSynchronizedBookTime(browser, bookAtEpochMs);
 
   // Book
-  await clickXPathFast(
-    browser,
-    "Book",
-    bookingSelectors.book,
-  );
-
-  let alertText = await getAlertText(browser)
+  let alertText = await clickBookAndCaptureResponses(browser);
 
   while (alertText !== null) {
     while (
@@ -428,13 +634,7 @@ export async function bookReservation(
     ) {
       await browser.pause(10_000);
 
-      await clickXPathFast(
-        browser,
-        "Book",
-        bookingSelectors.book,
-      );
-
-      alertText = await getAlertText(browser);
+      alertText = await clickBookAndCaptureResponses(browser);
     }
 
     if (alertText === null) {
@@ -476,13 +676,7 @@ export async function bookReservation(
     }
 
     // book again
-    await clickXPathFast(
-      browser,
-      "Book",
-      bookingSelectors.book,
-    );
-
-    alertText = await getAlertText(browser)
+    alertText = await clickBookAndCaptureResponses(browser);
   }
 
   if (alertText !== null) {
