@@ -544,7 +544,17 @@ function bookingApiFailure(
 
 async function clickBookAndCaptureResponses(
   browser: Browser,
+  day: string | undefined,
+  selectedCourt: string | undefined,
 ): Promise<string | null> {
+  if (
+    selectedCourt === "1" &&
+    (day === "Saturday" || day === "Sunday")
+  ) {
+    console.log("Weekend Court 1 selected. Waiting 250ms before Book click");
+    await browser.pause(250);
+  }
+
   await beginPostResponseCapture(browser);
   await clickXPathFast(browser, "Book", bookingSelectors.book);
   const responses = await logCapturedPostResponses(browser);
@@ -688,13 +698,14 @@ export async function bookReservation(
     bookingSelectors.nextUser,
   );
 
-  // temp
-  return;
-
   await waitForSynchronizedBookTime(browser, bookAtEpochMs);
 
   // Book
-  let alertText = await clickBookAndCaptureResponses(browser);
+  let alertText = await clickBookAndCaptureResponses(
+    browser,
+    day,
+    selectedCourt,
+  );
 
   while (alertText !== null) {
     while (
@@ -703,7 +714,11 @@ export async function bookReservation(
     ) {
       await browser.pause(10_000);
 
-      alertText = await clickBookAndCaptureResponses(browser);
+      alertText = await clickBookAndCaptureResponses(
+        browser,
+        day,
+        selectedCourt,
+      );
     }
 
     if (alertText === null) {
@@ -745,7 +760,11 @@ export async function bookReservation(
     }
 
     // book again
-    alertText = await clickBookAndCaptureResponses(browser);
+    alertText = await clickBookAndCaptureResponses(
+      browser,
+      day,
+      selectedCourt,
+    );
   }
 
   if (alertText !== null) {
