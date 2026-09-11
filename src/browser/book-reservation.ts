@@ -698,7 +698,6 @@ export async function bookReservation(
       alertText !== null &&
       alertText.includes("Too many requests")
     ) {
-      return
       await browser.pause(10_000);
 
       alertText = await clickBookAndCaptureResponses(browser);

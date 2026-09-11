@@ -108,7 +108,17 @@ export async function logInToPlayByPoint(browser: Browser) {
   }
 
   await browser.url(loginUrl);
-  await browser.pause(5000);
+
+  console.log("Waiting for Sign in button before entering credentials...");
+
+  const signInButton = await browser.$(loginSelectors.signIn).getElement();
+
+  await signInButton.waitForDisplayed({
+    timeout: 30_000,
+    timeoutMsg: "Sign in button was not visible within 30 seconds of opening the login page",
+  });
+
+  console.log("Sign in button is visible. Entering credentials...");
 
   await typeIntoSelector(
     browser,
