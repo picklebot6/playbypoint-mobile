@@ -546,12 +546,16 @@ async function clickBookAndCaptureResponses(
   browser: Browser,
   day: string | undefined,
   selectedCourt: string | undefined,
+  desiredTimes: readonly string[],
 ): Promise<string | null> {
-  if (
-    selectedCourt === "1" &&
-    (day === "Saturday" || day === "Sunday")
-  ) {
-    console.log("Weekend Court 1 selected. Waiting 250ms before Book click");
+  const isWeekend = day === "Saturday" || day === "Sunday";
+  const isNineToTenPm =
+    desiredTimes.includes("9-9:30pm") &&
+    desiredTimes.includes("9:30-10pm");
+
+  if (isWeekend && (selectedCourt === "1" || isNineToTenPm)) {
+    const delayReason = isNineToTenPm ? "9-10pm booking" : "Court 1";
+    console.log(`Weekend ${delayReason}. Waiting 250ms before Book click`);
     await browser.pause(250);
   }
 
@@ -705,6 +709,7 @@ export async function bookReservation(
     browser,
     day,
     selectedCourt,
+    desiredTimes,
   );
 
   while (alertText !== null) {
@@ -718,6 +723,7 @@ export async function bookReservation(
         browser,
         day,
         selectedCourt,
+        desiredTimes,
       );
     }
 
@@ -764,6 +770,7 @@ export async function bookReservation(
       browser,
       day,
       selectedCourt,
+      desiredTimes,
     );
   }
 
