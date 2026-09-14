@@ -96,15 +96,27 @@ async function bookNowIsVisible(browser: Browser): Promise<boolean> {
 }
 
 export async function logInToPlayByPoint(browser: Browser) {
-  const email = process.env.PLAYBYPOINT_EMAIL ?? "";
-  const password = process.env.PLAYBYPOINT_PASSWORD ?? "";
+  const day = process.env.PLAYBYPOINT_DAY?.trim();
+  const useSecondCredentials = day === "Tuesday" || day === "Thursday";
+  const emailVariable = useSecondCredentials
+    ? "PLAYBYPOINT_EMAIL_2"
+    : "PLAYBYPOINT_EMAIL";
+  const passwordVariable = useSecondCredentials
+    ? "PLAYBYPOINT_PASSWORD_2"
+    : "PLAYBYPOINT_PASSWORD";
+  const email = process.env[emailVariable] ?? "";
+  const password = process.env[passwordVariable] ?? "";
+
+  console.log(
+    `Using ${useSecondCredentials ? "second" : "default"} PlayByPoint credentials${day ? ` for ${day}` : ""}`,
+  );
 
   if (!email) {
-    throw new Error("PLAYBYPOINT_EMAIL is not set");
+    throw new Error(`${emailVariable} is not set`);
   }
 
   if (!password) {
-    throw new Error("PLAYBYPOINT_PASSWORD is not set");
+    throw new Error(`${passwordVariable} is not set`);
   }
 
   await browser.url(loginUrl);
