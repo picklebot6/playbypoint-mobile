@@ -702,6 +702,8 @@ export async function bookReservation(
     bookingSelectors.nextUser,
   );
 
+  return; //temp testing
+
   await waitForSynchronizedBookTime(browser, bookAtEpochMs);
 
   // Book

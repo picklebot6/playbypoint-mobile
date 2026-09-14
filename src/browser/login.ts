@@ -97,7 +97,10 @@ async function bookNowIsVisible(browser: Browser): Promise<boolean> {
 
 export async function logInToPlayByPoint(browser: Browser) {
   const day = process.env.PLAYBYPOINT_DAY?.trim();
-  const useSecondCredentials = day === "Tuesday" || day === "Thursday";
+  const credentialSet = process.env.PLAYBYPOINT_CREDENTIAL_SET?.trim();
+  const useSecondCredentials = credentialSet
+    ? credentialSet === "2"
+    : day === "Tuesday" || day === "Thursday";
   const emailVariable = useSecondCredentials
     ? "PLAYBYPOINT_EMAIL_2"
     : "PLAYBYPOINT_EMAIL";
