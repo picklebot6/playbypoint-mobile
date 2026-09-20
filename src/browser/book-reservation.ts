@@ -452,17 +452,20 @@ async function logCapturedPostResponses(
           ).__playByPointPostCapture;
 
           return Boolean(
-            state && state.pending === 0 && state.responses.length > 0,
+            state &&
+              state.responses.some((response) =>
+                response.url.includes("/booking_player"),
+              ),
           );
         }),
       {
-        timeout: 10_000,
+        timeout: 15_000,
         interval: 100,
-        timeoutMsg: "No completed POST response was captured after Book click",
+        timeoutMsg: "No booking API response was captured after Book click",
       },
     );
   } catch {
-    console.log("No completed fetch/XHR POST response captured after Book click");
+    console.log("No /booking_player POST response captured after Book click");
   }
 
   const responses = await browser.execute(() => {
@@ -562,6 +565,22 @@ async function clickBookAndCaptureResponses(
   await beginPostResponseCapture(browser);
   await clickXPathFast(browser, "Book", bookingSelectors.book);
   const responses = await logCapturedPostResponses(browser);
+  const bookingResponse = responses.find((response) =>
+    response.url.includes("/booking_player"),
+  );
+
+  if (!bookingResponse) {
+    const alertText = await getAlertText(browser);
+
+    if (alertText !== null) {
+      return alertText;
+    }
+
+    throw new Error(
+      "Book was clicked, but no /booking_player response or booking alert was captured within 15 seconds",
+    );
+  }
+
   const apiFailure = bookingApiFailure(responses);
   const alertText = await getAlertText(browser);
 
