@@ -160,8 +160,8 @@ function createBookingPayload(
 
   return {
     reservation: {
-      // date: getBookingDate(),
-      date: "2026-09-28", //temp
+      date: getBookingDate(),
+      // date: "2026-09-28", //temp
       hour_start: hourStart,
       hour_end: hourEnd,
       reservation_type: 2,
