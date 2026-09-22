@@ -55,18 +55,100 @@ jobs:
 
           if [[ "$FIVE_RUN_TEST" == "true" ]]; then
             book_at_epoch_ms=$(( $(date +%s%3N) + 300000 ))
-            matrix='{"include":[{"run_id":"8-830am-Court-2","desired_times":"8-8:30am","court_hierarchy":"2,6","primary":"","secondary":"Yena Kim"},{"run_id":"8-830am-Court-4","desired_times":"8-8:30am","court_hierarchy":"4,1","primary":"","secondary":"Yena Kim"},{"run_id":"8-830am-Court-8","desired_times":"8-8:30am","court_hierarchy":"8,5","primary":"","secondary":"Yena Kim"},{"run_id":"8-830am-Court-9","desired_times":"8-8:30am","court_hierarchy":"9,10","primary":"","secondary":"Yena Kim"},{"run_id":"8-830am-Court-3","desired_times":"8-8:30am","court_hierarchy":"3,7","primary":"","secondary":"Yena Kim"}]}'
+
+            matrix='{"include":[
+              {
+                "run_id":"8-830am-Creds-1",
+                "credential_set":"1",
+                "desired_times":"8am-8:30am",
+                "court_hierarchy":"4,8,9,3,2,6,1",
+                "primary":"Matt Lim",
+                "secondary":"Yena Kim"
+              },
+              {
+                "run_id":"8-830am-Creds-2",
+                "credential_set":"2",
+                "desired_times":"8am-8:30am",
+                "court_hierarchy":"9,8,4,3,2,6,1",
+                "primary":"Matt Lim",
+                "secondary":"Yena Kim"
+              }
+            ]}'
+
             echo "Five-run synchronized test will release at epoch ${book_at_epoch_ms}ms"
+
           elif [[ "$day" == "Monday" || "$day" == "Tuesday" || "$day" == "Thursday" ]]; then
-            matrix='{"include":[{"run_id":"730-930pm-Court-4-Creds-1","credential_set":"1","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"4","primary":"","secondary":"Paul Rodriguez"},{"run_id":"730-930pm-Court-8-Creds-1","credential_set":"1","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"8,1","primary":"","secondary":"Paul Rodriguez"},{"run_id":"730-930pm-Court-9-Creds-1","credential_set":"1","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"9,10","primary":"","secondary":"Paul Rodriguez"},{"run_id":"730-930pm-Court-2-Creds-2","credential_set":"2","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"2","primary":"","secondary":"Paul Rodriguez"},{"run_id":"730-930pm-Court-3-Creds-2","credential_set":"2","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"3","primary":"","secondary":"Paul Rodriguez"},{"run_id":"730-930pm-Court-6-Creds-2","credential_set":"2","desired_times":"7:30-8pm,8-8:30pm,8:30-9pm,9-9:30pm","court_hierarchy":"6,5","primary":"","secondary":"Paul Rodriguez"}]}'
+
+            matrix='{"include":[
+              {
+                "run_id":"730-930pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"7:30pm-9:30pm",
+                "court_hierarchy":"4,8,9,3,2,6,1",
+                "primary":"Paul Rodriguez",
+                "secondary":"Dexter Dizon"
+              }
+            ]}'
+
           elif [[ "$day" == "Wednesday" ]]; then
-            matrix='{"include":[{"run_id":"7-9pm-Court-2","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"2,6","primary":"","secondary":"E K"},{"run_id":"7-9pm-Court-4","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"4,1","primary":"","secondary":"E K"},{"run_id":"7-9pm-Court-8","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"8,5","primary":"","secondary":"E K"},{"run_id":"7-9pm-Court-9","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"9,10","primary":"","secondary":"E K"},{"run_id":"7-9pm-Court-3","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"3,7","primary":"","secondary":"E K"},{"run_id":"9-10pm-Court-2","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"2,6","primary":"Derek Dang","secondary":"Lia Barnes"},{"run_id":"9-10pm-Court-4","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"4,1","primary":"Derek Dang","secondary":"Lia Barnes"},{"run_id":"9-10pm-Court-8","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"8,5","primary":"Derek Dang","secondary":"Lia Barnes"},{"run_id":"9-10pm-Court-9","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"9,10","primary":"Derek Dang","secondary":"Lia Barnes"},{"run_id":"9-10pm-Court-3","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"3,7","primary":"Derek Dang","secondary":"Lia Barnes"}]}'
+
+            matrix='{"include":[
+              {
+                "run_id":"7-9pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"7pm-9pm",
+                "court_hierarchy":"4,8,9,3,2,6,1",
+                "primary":"Yena Kim",
+                "secondary":"E K"
+              },
+              {
+                "run_id":"9-10pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"9pm-10pm",
+                "court_hierarchy":"4,8,9,3,2,6,1",
+                "primary":"Derek Dang",
+                "secondary":"Lia Barnes"
+              }
+            ]}'
+
           elif [[ "$day" == "Saturday" || "$day" == "Sunday" ]]; then
-            matrix='{"include":[{"run_id":"7-9pm-Court-1","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"1,5","primary":"","secondary":"Matt Lim"},{"run_id":"7-9pm-Court-2","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"2","primary":"","secondary":"Matt Lim"},{"run_id":"7-9pm-Court-3","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"3","primary":"","secondary":"Matt Lim"},{"run_id":"7-9pm-Court-4","desired_times":"7-7:30pm,7:30-8pm,8-8:30pm,8:30-9pm","court_hierarchy":"4","primary":"","secondary":"Matt Lim"},{"run_id":"9-10pm-Court-1","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"1,5","primary":"Harrison Yang","secondary":"Charlee Liu"},{"run_id":"9-10pm-Court-2","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"2","primary":"Harrison Yang","secondary":"Charlee Liu"},{"run_id":"9-10pm-Court-3","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"3","primary":"Harrison Yang","secondary":"Charlee Liu"},{"run_id":"9-10pm-Court-4","desired_times":"9-9:30pm,9:30-10pm","court_hierarchy":"4","primary":"Harrison Yang","secondary":"Charlee Liu"}]}'
+
+            matrix='{"include":[
+              {
+                "run_id":"7-9pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"7pm-9pm",
+                "court_hierarchy":"4,3,2,1,5",
+                "primary":"Yena Kim",
+                "secondary":"Matt Lim"
+              },
+              {
+                "run_id":"9-10pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"9pm-10pm",
+                "court_hierarchy":"4,3,2,1,5",
+                "primary":"Harrison Yang",
+                "secondary":"Charlee Liu"
+              }
+            ]}'
+
           else
+
             should_run=false
-            matrix='{"include":[{"run_id":"none","desired_times":"","court_hierarchy":"","primary":"","secondary":""}]}'
+
+            matrix='{"include":[
+              {
+                "run_id":"none",
+                "credential_set":"1",
+                "desired_times":"",
+                "court_hierarchy":"",
+                "primary":"",
+                "secondary":""
+              }
+            ]}'
+
             echo "No booking runs are configured for $day"
+
           fi
 
           echo "should_run=$should_run" >> "$GITHUB_OUTPUT"

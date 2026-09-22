@@ -13,7 +13,7 @@ import {
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { execFile } from "node:child_process";
-import { bookReservation, ReservationInputs } from "./book-reservation";
+import { ReservationInputs, bookReservationAPI } from "./book-reservation";
 
 export async function pause(message = "Press Enter to continue...") {
   const readline = createInterface({ input, output });
@@ -160,17 +160,20 @@ function optionalEpochMillisecondsInput(name: string): number | undefined {
 export const bookingInputs: ReservationInputs = {
   courtHierarchy: listInput(
     "PLAYBYPOINT_COURT_HIERARCHY",
-    ["4", "8", "9", "3", "2", "6", "1", "5", "10", "7"],
+    ["4", "8", "9", "3", "2", "6", "1"],
   ),
-  desiredTimes: listInput(
-    "PLAYBYPOINT_DESIRED_TIMES",
-    ["7:30-8pm", "8-8:30pm", "8:30-9pm", "9-9:30pm"],
-  ),
+
+  desiredTimes:
+    process.env.PLAYBYPOINT_DESIRED_TIMES?.trim() ||
+    "8-9:30am",
+    // "7:30pm-9:30pm",
+
   primary:
-    process.env.PLAYBYPOINT_PRIMARY?.trim() || "",
+    process.env.PLAYBYPOINT_PRIMARY?.trim() || "Yena Kim",
+
   secondary:
     process.env.PLAYBYPOINT_SECONDARY?.trim() || "Matt Lim",
-  day: process.env.PLAYBYPOINT_DAY?.trim() || undefined,
+
   bookAtEpochMs: optionalEpochMillisecondsInput(
     "PLAYBYPOINT_BOOK_AT_EPOCH_MS",
   ),
@@ -190,13 +193,17 @@ export const availableSteps: Record<string, BrowserWorkflowStep> = {
     name: "login",
     run: logInToPlayByPoint,
   },
+
   navigateToBooking: {
     name: "navigate to booking",
     run: navigateToBooking,
   },
+
   bookReservation: {
     name: "book the reservation",
-    run: (browser) => bookReservation(browser, bookingInputs),
+    run: async (browser) => {
+      await bookReservationAPI(browser, bookingInputs);
+    },
   },
 };
 
