@@ -1,4 +1,4 @@
-name: Android Chrome Main Workflow
+name: Run PlayByPoint Booking
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ on:
           - Saturday
           - Sunday
       five_run_test:
-        description: Run the five synchronized booking tests
+        description: Run the synchronized booking tests
         required: false
         default: false
         type: boolean
@@ -26,7 +26,7 @@ on:
 jobs:
   select-runs:
     name: Select runs for current day
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     outputs:
       matrix: ${{ steps.schedule.outputs.matrix }}
@@ -152,12 +152,18 @@ jobs:
           fi
 
           echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "matrix<<EOF"
+            echo "$matrix"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
           echo "day=$day" >> "$GITHUB_OUTPUT"
           echo "book_at_epoch_ms=$book_at_epoch_ms" >> "$GITHUB_OUTPUT"
 
   android-chrome-main:
-    name: Android Chrome Run ${{ matrix.run_id }}
+    name: PlayByPoint Run ${{ matrix.run_id }}
     needs: select-runs
     if: ${{ needs.select-runs.outputs.should_run == 'true' }}
     runs-on: ubuntu-22.04
