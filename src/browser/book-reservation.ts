@@ -554,7 +554,7 @@ export async function bookReservationAPI(
     secondary,
   );
 
-  console.log("Booking payload:", payload);
+  // console.log("Booking payload:", payload);
 
   // Use batches of 2 for days with two time periods.
   // Use batches of 4 for Monday/Tuesday/Thursday.
