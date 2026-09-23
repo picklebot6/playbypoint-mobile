@@ -161,7 +161,7 @@ function createBookingPayload(
   return {
     reservation: {
       date: getBookingDate(),
-      // date: "2026-09-28", //temp
+      // date: "2026-09-28", // temp
       hour_start: hourStart,
       hour_end: hourEnd,
       reservation_type: 2,
@@ -214,77 +214,6 @@ function createBookingPayload(
   };
 }
 
-async function postBooking(
-  browser: Browser,
-  courtId: number,
-  payload: unknown,
-): Promise<BookingResponse> {
-  const result = await browser.executeAsync(
-    (
-      courtId: number,
-      payload: unknown,
-      done: (result: BookingResponse) => void,
-    ) => {
-      void (async () => {
-        try {
-          const csrfToken = document
-            .querySelector('meta[name="csrf-token"]')
-            ?.getAttribute("content");
-
-          if (!csrfToken) {
-            throw new Error("CSRF token not found");
-          }
-
-          const response = await fetch(
-            `/api/courts/${courtId}/booking_player`,
-            {
-              method: "POST",
-              credentials: "same-origin",
-              headers: {
-                Accept:
-                  "application/json, text/javascript, */*; q=0.01",
-                "Content-Type": "application/json",
-                "X-CSRF-Token": csrfToken,
-                "X-Requested-With": "XMLHttpRequest",
-              },
-              body: JSON.stringify(payload),
-            },
-          );
-
-          const text = await response.text();
-
-          let body: unknown;
-
-          try {
-            body = JSON.parse(text);
-          } catch {
-            body = text;
-          }
-
-          done({
-            status: response.status,
-            ok: response.ok,
-            body,
-          });
-        } catch (error) {
-          done({
-            status: 0,
-            ok: false,
-            body:
-              error instanceof Error
-                ? error.message
-                : String(error),
-          });
-        }
-      })();
-    },
-    courtId,
-    payload,
-  );
-
-  return result;
-}
-
 async function postBookingsConcurrently(
   browser: Browser,
   courts: readonly string[],
@@ -335,7 +264,8 @@ async function postBookingsConcurrently(
                           "application/json, text/javascript, */*; q=0.01",
                         "Content-Type": "application/json",
                         "X-CSRF-Token": csrfToken,
-                        "X-Requested-With": "XMLHttpRequest",
+                        "X-Requested-With":
+                          "XMLHttpRequest",
                       },
                       body: JSON.stringify(payload),
                     },
@@ -397,6 +327,65 @@ async function postBookingsConcurrently(
     requests,
     payload,
   );
+}
+
+async function postBookingsInBatches(
+  browser: Browser,
+  courts: readonly string[],
+  payload: unknown,
+  batchSize: number,
+): Promise<ConcurrentBookingResponse[]> {
+  const allResults: ConcurrentBookingResponse[] = [];
+
+  for (
+    let i = 0;
+    i < courts.length;
+    i += batchSize
+  ) {
+    const batch = courts.slice(i, i + batchSize);
+
+    console.log(
+      `Starting booking batch: ${batch.join(", ")}`,
+    );
+
+    const batchStartedAt = Date.now();
+
+    const results = await postBookingsConcurrently(
+      browser,
+      batch,
+      payload,
+    );
+
+    const batchCompletedAt = Date.now();
+
+    console.log(
+      `Booking batch completed: ${batch.join(", ")}; ` +
+        `duration=${batchCompletedAt - batchStartedAt}ms`,
+    );
+
+    for (const result of results) {
+      console.log(
+        `Court ${result.court} (API ${result.courtId}) -> ` +
+          `status=${result.status}; ` +
+          `started=${new Date(
+            result.requestStartedAt,
+          ).toISOString()}; ` +
+          `completed=${new Date(
+            result.requestCompletedAt,
+          ).toISOString()}; ` +
+          `duration=${result.durationMs}ms`,
+      );
+
+      console.log(
+        `Court ${result.court} response: ` +
+          JSON.stringify(result.body),
+      );
+    }
+
+    allResults.push(...results);
+  }
+
+  return allResults;
 }
 
 async function waitForSynchronizedBookTime(
@@ -531,7 +520,9 @@ export async function bookReservationAPI(
     bookAtEpochMs,
   });
 
-  console.log("Continuing in the existing booking iframe");
+  console.log(
+    "Continuing in the existing booking iframe",
+  );
 
   await waitForTimer(
     browser,
@@ -565,42 +556,36 @@ export async function bookReservationAPI(
 
   console.log("Booking payload:", payload);
 
+  // Use batches of 2 for days with two time periods.
+  // Use batches of 4 for Monday/Tuesday/Thursday.
+  const batchSize =
+    desiredTimes === "7pm-9pm" ||
+    desiredTimes === "9pm-10pm"
+      ? 2
+      : 4;
+
+  console.log(
+    `Using booking batch size: ${batchSize}`,
+  );
+
   const requestReleaseAt = Date.now();
 
   console.log(
-    `Launching concurrent booking requests at ` +
+    `Launching booking batches at ` +
       `${new Date(requestReleaseAt).toISOString()} ` +
       `(${requestReleaseAt})`,
   );
 
-  const results = await postBookingsConcurrently(
+  const results = await postBookingsInBatches(
     browser,
     courtHierarchy,
     payload,
+    batchSize,
   );
 
   console.log(
     `All ${results.length} booking requests completed.`,
   );
-
-  for (const result of results) {
-    console.log(
-      `Court ${result.court} (API ${result.courtId}) -> ` +
-        `status=${result.status}; ` +
-        `started=${new Date(
-          result.requestStartedAt,
-        ).toISOString()}; ` +
-        `completed=${new Date(
-          result.requestCompletedAt,
-        ).toISOString()}; ` +
-        `duration=${result.durationMs}ms`,
-    );
-
-    console.log(
-      `Court ${result.court} response: ` +
-        JSON.stringify(result.body),
-    );
-  }
 
   const successful = results.filter(
     (result) =>
