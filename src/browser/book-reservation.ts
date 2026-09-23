@@ -547,6 +547,15 @@ export async function bookReservationAPI(
     bookAtEpochMs,
   );
 
+  // Delay 9-10pm bookings by 500ms.
+  if (desiredTimes === "9pm-10pm") {
+    console.log(
+      "9-10pm booking. Waiting 500ms before API requests.",
+    );
+
+    await browser.pause(500);
+  }
+
   // Build one identical payload for every court.
   const payload = createBookingPayload(
     desiredTimes,
