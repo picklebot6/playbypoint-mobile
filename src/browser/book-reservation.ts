@@ -442,6 +442,23 @@ async function armBookingsForTimerDisappearance(
         }
       };
 
+      const dispatchAfterTimerPaints = async (
+        timerDisappearedAtMs: number,
+      ) => {
+        // The first animation frame is scheduled before the next paint. The
+        // second runs on the following frame, after Chrome has had a chance
+        // to paint the page without the countdown.
+        await new Promise<void>((resolve) => {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              resolve();
+            });
+          });
+        });
+
+        await dispatch(timerDisappearedAtMs);
+      };
+
       const releaseWhenTimerDisappears = () => {
         if (
           state.timerDisappearedAtMs !== undefined ||
@@ -451,7 +468,9 @@ async function armBookingsForTimerDisappearance(
         }
 
         state.timerDisappearedAtMs = now();
-        void dispatch(state.timerDisappearedAtMs);
+        void dispatchAfterTimerPaints(
+          state.timerDisappearedAtMs,
+        );
         return true;
       };
 
