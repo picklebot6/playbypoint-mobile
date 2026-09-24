@@ -215,341 +215,377 @@ function createBookingPayload(
   };
 }
 
-async function postBookingsConcurrently(
+async function armBookingsForTimerDisappearance(
   browser: Browser,
   courts: readonly string[],
   payload: unknown,
-  timerDisappearedAtMs: number,
-): Promise<ConcurrentBookingResponse[]> {
+  batchSize: number,
+  timerXpath: string,
+  bookAtEpochMs: number | undefined,
+  delayAfterReleaseMs: number,
+): Promise<void> {
   const requests = courts.map((court) => ({
     court,
     courtId: getCourtId(court),
   }));
 
-  return browser.executeAsync(
+  await browser.execute(
     (
       requests: Array<{
         court: string;
         courtId: number;
       }>,
       payload: unknown,
-      timerDisappearedAtMs: number,
-      done: (
-        results: ConcurrentBookingResponse[],
-      ) => void,
+      batchSize: number,
+      timerXpath: string,
+      bookAtEpochMs: number | undefined,
+      delayAfterReleaseMs: number,
     ) => {
-      void (async () => {
-        try {
-          const csrfToken = document
-            .querySelector('meta[name="csrf-token"]')
-            ?.getAttribute("content");
+      type BookingDispatchWindow = Window & {
+        __playByPointBookingDispatch?: {
+          completed: boolean;
+          error?: string;
+          results: ConcurrentBookingResponse[];
+          timerDisappearedAtMs?: number;
+        };
+      };
 
-          if (!csrfToken) {
-            throw new Error("CSRF token not found");
+      const dispatchWindow = window as BookingDispatchWindow;
+      const state: NonNullable<
+        BookingDispatchWindow["__playByPointBookingDispatch"]
+      > = {
+        completed: false,
+        results: [] as ConcurrentBookingResponse[],
+      };
+
+      dispatchWindow.__playByPointBookingDispatch = state;
+
+      const now = () =>
+        performance.timeOrigin + performance.now();
+
+      const csrfToken = document
+        .querySelector('meta[name="csrf-token"]')
+        ?.getAttribute("content");
+
+      if (!csrfToken) {
+        state.error = "CSRF token not found";
+        state.completed = true;
+        return;
+      }
+
+      const preparedRequests = requests.map(
+        ({ court, courtId }) => ({
+          court,
+          courtId,
+          url: `/api/courts/${courtId}/booking_player`,
+          options: {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept:
+                "application/json, text/javascript, */*; q=0.01",
+              "Content-Type": "application/json",
+              "X-CSRF-Token": csrfToken,
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: JSON.stringify(payload),
+          } satisfies RequestInit,
+        }),
+      );
+
+      const timerIsVisible = () => {
+        const snapshot = document.evaluate(
+          timerXpath,
+          document,
+          null,
+          XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+          null,
+        );
+
+        for (
+          let index = 0;
+          index < snapshot.snapshotLength;
+          index += 1
+        ) {
+          const node = snapshot.snapshotItem(index);
+
+          if (!(node instanceof HTMLElement)) {
+            continue;
           }
 
-          const results = await Promise.all(
-            requests.map(
-              async ({
-                court,
-                courtId,
-              }): Promise<ConcurrentBookingResponse> => {
-                const requestUrl =
-                  `/api/courts/${courtId}/booking_player`;
-                const requestOptions: RequestInit = {
-                  method: "POST",
-                  credentials: "same-origin",
-                  headers: {
-                    Accept:
-                      "application/json, text/javascript, */*; q=0.01",
-                    "Content-Type": "application/json",
-                    "X-CSRF-Token": csrfToken,
-                    "X-Requested-With":
-                      "XMLHttpRequest",
-                  },
-                  body: JSON.stringify(payload),
-                };
-                const requestStartedAt =
-                  performance.timeOrigin +
-                  performance.now();
-                const elapsedSinceTimerDisappearedMs =
-                  requestStartedAt -
-                  timerDisappearedAtMs;
+          const style = window.getComputedStyle(node);
 
-                try {
-                  const response = await fetch(
-                    requestUrl,
-                    requestOptions,
-                  );
+          if (
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            node.getClientRects().length > 0
+          ) {
+            return true;
+          }
+        }
 
-                  const text = await response.text();
+        return false;
+      };
 
-                  let body: unknown;
+      const dispatch = async (
+        timerDisappearedAtMs: number,
+      ) => {
+        try {
+          const synchronizedReleaseAt =
+            bookAtEpochMs ?? timerDisappearedAtMs;
+          const releaseAt =
+            Math.max(
+              timerDisappearedAtMs,
+              synchronizedReleaseAt,
+            ) + delayAfterReleaseMs;
+          const remainingDelayMs = releaseAt - now();
+
+          if (remainingDelayMs > 0) {
+            await new Promise<void>((resolve) => {
+              window.setTimeout(resolve, remainingDelayMs);
+            });
+          }
+
+          for (
+            let index = 0;
+            index < preparedRequests.length;
+            index += batchSize
+          ) {
+            const batch = preparedRequests.slice(
+              index,
+              index + batchSize,
+            );
+            const batchResults = await Promise.all(
+              batch.map(
+                async ({
+                  court,
+                  courtId,
+                  url,
+                  options,
+                }): Promise<ConcurrentBookingResponse> => {
+                  const requestStartedAt =
+                    performance.timeOrigin +
+                    performance.now();
+                  const elapsedSinceTimerDisappearedMs =
+                    requestStartedAt -
+                    timerDisappearedAtMs;
 
                   try {
-                    body = JSON.parse(text);
-                  } catch {
-                    body = text;
+                    const response = await fetch(
+                      url,
+                      options,
+                    );
+
+                    const text = await response.text();
+
+                    let body: unknown;
+
+                    try {
+                      body = JSON.parse(text);
+                    } catch {
+                      body = text;
+                    }
+
+                    const requestCompletedAt =
+                      performance.timeOrigin +
+                      performance.now();
+
+                    return {
+                      court,
+                      courtId,
+                      status: response.status,
+                      ok: response.ok,
+                      body,
+                      requestStartedAt,
+                      requestCompletedAt,
+                      durationMs:
+                        requestCompletedAt -
+                        requestStartedAt,
+                      elapsedSinceTimerDisappearedMs,
+                    };
+                  } catch (error) {
+                    const requestCompletedAt =
+                      performance.timeOrigin +
+                      performance.now();
+
+                    return {
+                      court,
+                      courtId,
+                      status: 0,
+                      ok: false,
+                      body:
+                        error instanceof Error
+                          ? error.message
+                          : String(error),
+                      requestStartedAt,
+                      requestCompletedAt,
+                      durationMs:
+                        requestCompletedAt -
+                        requestStartedAt,
+                      elapsedSinceTimerDisappearedMs,
+                    };
                   }
+                },
+              ),
+            );
 
-                  const requestCompletedAt =
-                    performance.timeOrigin +
-                    performance.now();
+            state.results.push(...batchResults);
+          }
 
-                  return {
-                    court,
-                    courtId,
-                    status: response.status,
-                    ok: response.ok,
-                    body,
-                    requestStartedAt,
-                    requestCompletedAt,
-                    durationMs:
-                      requestCompletedAt -
-                      requestStartedAt,
-                    elapsedSinceTimerDisappearedMs,
-                  };
-                } catch (error) {
-                  const requestCompletedAt =
-                    performance.timeOrigin +
-                    performance.now();
-
-                  return {
-                    court,
-                    courtId,
-                    status: 0,
-                    ok: false,
-                    body:
-                      error instanceof Error
-                        ? error.message
-                        : String(error),
-                    requestStartedAt,
-                    requestCompletedAt,
-                    durationMs:
-                      requestCompletedAt -
-                      requestStartedAt,
-                    elapsedSinceTimerDisappearedMs,
-                  };
-                }
-              },
-            ),
-          );
-
-          done(results);
+          state.completed = true;
         } catch (error) {
-          throw error;
+          state.error =
+            error instanceof Error
+              ? error.message
+              : String(error);
+          state.completed = true;
         }
-      })();
+      };
+
+      const releaseWhenTimerDisappears = () => {
+        if (
+          state.timerDisappearedAtMs !== undefined ||
+          timerIsVisible()
+        ) {
+          return false;
+        }
+
+        state.timerDisappearedAtMs = now();
+        void dispatch(state.timerDisappearedAtMs);
+        return true;
+      };
+
+      if (releaseWhenTimerDisappears()) {
+        return;
+      }
+
+      const observer = new MutationObserver(() => {
+        if (releaseWhenTimerDisappears()) {
+          observer.disconnect();
+        }
+      });
+
+      observer.observe(document.documentElement, {
+        attributes: true,
+        characterData: true,
+        childList: true,
+        subtree: true,
+      });
     },
     requests,
     payload,
-    timerDisappearedAtMs,
+    batchSize,
+    timerXpath,
+    bookAtEpochMs,
+    delayAfterReleaseMs,
   );
 }
 
-async function postBookingsInBatches(
+async function waitForArmedBookingResults(
   browser: Browser,
-  courts: readonly string[],
-  payload: unknown,
-  batchSize: number,
-  timerDisappearedAtMs: number,
 ): Promise<ConcurrentBookingResponse[]> {
-  const allResults: ConcurrentBookingResponse[] = [];
+  await browser.waitUntil(
+    async () =>
+      browser.execute(() => {
+        const state = (
+          window as Window & {
+            __playByPointBookingDispatch?: {
+              completed: boolean;
+              error?: string;
+            };
+          }
+        ).__playByPointBookingDispatch;
 
-  for (
-    let i = 0;
-    i < courts.length;
-    i += batchSize
-  ) {
-    const batch = courts.slice(i, i + batchSize);
-
-    console.log(
-      `Starting booking batch: ${batch.join(", ")}`,
-    );
-
-    const batchStartedAt = Date.now();
-
-    const results = await postBookingsConcurrently(
-      browser,
-      batch,
-      payload,
-      timerDisappearedAtMs,
-    );
-
-    const batchCompletedAt = Date.now();
-
-    console.log(
-      `Booking batch completed: ${batch.join(", ")}; ` +
-        `duration=${batchCompletedAt - batchStartedAt}ms`,
-    );
-
-    for (const result of results) {
-      console.log(
-        `Court ${result.court} (API ${result.courtId}) -> ` +
-          `status=${result.status}; ` +
-          `started=${new Date(
-            result.requestStartedAt,
-          ).toISOString()}; ` +
-          `completed=${new Date(
-            result.requestCompletedAt,
-          ).toISOString()}; ` +
-          `duration=${result.durationMs}ms`,
-      );
-
-      console.log(
-        `Court ${result.court} fetch started ` +
-          `${result.elapsedSinceTimerDisappearedMs.toFixed(3)}ms ` +
-          `after the booking timer disappeared`,
-      );
-
-      console.log(
-        `Court ${result.court} response: ` +
-          JSON.stringify(result.body),
-      );
-    }
-
-    allResults.push(...results);
-  }
-
-  return allResults;
-}
-
-async function waitForSynchronizedBookTime(
-  browser: Browser,
-  bookAtEpochMs?: number,
-): Promise<void> {
-  if (bookAtEpochMs === undefined) {
-    return;
-  }
-
-  const remainingMs = bookAtEpochMs - Date.now();
-
-  if (remainingMs <= 0) {
-    throw new Error(
-      `Synchronized booking time ${new Date(
-        bookAtEpochMs,
-      ).toISOString()} was already reached before this run was ready`,
-    );
-  }
-
-  console.log(
-    `Waiting for synchronized booking time: ${new Date(
-      bookAtEpochMs,
-    ).toISOString()}`,
+        return Boolean(state?.completed || state?.error);
+      }),
+    {
+      timeout: 5 * 60 * 1000,
+      interval: 25,
+      timeoutMsg:
+        "Booking requests did not complete within 5 minutes",
+    },
   );
 
-  while (true) {
-    const remaining = bookAtEpochMs - Date.now();
+  const state = await browser.execute(() =>
+    (
+      window as Window & {
+        __playByPointBookingDispatch?: {
+          error?: string;
+          results: ConcurrentBookingResponse[];
+        };
+      }
+    ).__playByPointBookingDispatch,
+  );
 
-    if (remaining <= 0) {
-      break;
-    }
-
-    await browser.pause(Math.min(250, remaining));
+  if (!state) {
+    throw new Error("Browser booking dispatch state was lost");
   }
 
-  console.log("Synchronized booking time reached");
+  if (state.error) {
+    throw new Error(state.error);
+  }
+
+  return state.results;
 }
 
 async function waitForTimer(
   browser: Browser,
-  xpath: string,
 ): Promise<number> {
   let lastLoggedAt = 0;
-
-  await browser.execute((timerXpath: string) => {
-    type BookingTimingWindow = Window & {
-      __playByPointBookingTiming?: {
-        timerDisappearedAtMs?: number;
-      };
-    };
-
-    const timingWindow = window as BookingTimingWindow;
-    timingWindow.__playByPointBookingTiming = {};
-
-    const now = () =>
-      performance.timeOrigin + performance.now();
-
-    const timerIsVisible = () => {
-      const snapshot = document.evaluate(
-        timerXpath,
-        document,
-        null,
-        XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-        null,
-      );
-
-      for (let index = 0; index < snapshot.snapshotLength; index += 1) {
-        const node = snapshot.snapshotItem(index);
-
-        if (!(node instanceof HTMLElement)) {
-          continue;
-        }
-
-        const style = window.getComputedStyle(node);
-
-        if (
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          node.getClientRects().length > 0
-        ) {
-          return true;
-        }
-      }
-
-      return false;
-    };
-
-    const recordDisappearance = () => {
-      if (
-        timingWindow.__playByPointBookingTiming
-          ?.timerDisappearedAtMs !== undefined ||
-        timerIsVisible()
-      ) {
-        return false;
-      }
-
-      timingWindow.__playByPointBookingTiming = {
-        timerDisappearedAtMs: now(),
-      };
-
-      return true;
-    };
-
-    if (recordDisappearance()) {
-      return;
-    }
-
-    const observer = new MutationObserver(() => {
-      if (recordDisappearance()) {
-        observer.disconnect();
-      }
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      characterData: true,
-      childList: true,
-      subtree: true,
-    });
-  }, xpath);
+  let timerDisappearedAtMs: number | undefined;
 
   await browser.waitUntil(
     async () => {
-      const elements = await browser
-        .$$(xpath)
-        .getElements();
+      const timerState = await browser.execute(
+        (
+          hoursXpath: string,
+          minutesXpath: string,
+          secondsXpath: string,
+        ) => {
+          const dispatchState = (
+            window as Window & {
+              __playByPointBookingDispatch?: {
+                error?: string;
+                timerDisappearedAtMs?: number;
+              };
+            }
+          ).__playByPointBookingDispatch;
 
-      let timerIsVisible = false;
+          const readText = (partXpath: string) => {
+            const node = document.evaluate(
+              partXpath,
+              document,
+              null,
+              XPathResult.FIRST_ORDERED_NODE_TYPE,
+              null,
+            ).singleNodeValue;
 
-      for (const element of elements) {
-        if (await element.isDisplayed()) {
-          timerIsVisible = true;
-          break;
-        }
+            return node?.textContent?.trim() ?? "";
+          };
+
+          return {
+            error: dispatchState?.error,
+            timerDisappearedAtMs:
+              dispatchState?.timerDisappearedAtMs,
+            hours: readText(hoursXpath),
+            minutes: readText(minutesXpath),
+            seconds: readText(secondsXpath),
+          };
+        },
+        bookingSelectors.hr,
+        bookingSelectors.min,
+        bookingSelectors.sec,
+      );
+
+      if (timerState.error) {
+        throw new Error(timerState.error);
       }
 
-      if (!timerIsVisible) {
+      if (
+        timerState.timerDisappearedAtMs !== undefined
+      ) {
+        timerDisappearedAtMs =
+          timerState.timerDisappearedAtMs;
         return true;
       }
 
@@ -561,34 +597,11 @@ async function waitForTimer(
 
       lastLoggedAt = now;
 
-      const readTimerPart = async (
-        timerPartXpath: string,
-      ) => {
-        const timerParts = await browser
-          .$$(timerPartXpath)
-          .getElements();
-
-        const timerPart = timerParts[0];
-
-        if (!timerPart) {
-          return "";
-        }
-
-        const textContent =
-          await timerPart.getProperty("textContent");
-
-        return String(textContent ?? "").trim();
-      };
-
-      const [hours, minutes, seconds] =
-        await Promise.all([
-          readTimerPart(bookingSelectors.hr),
-          readTimerPart(bookingSelectors.min),
-          readTimerPart(bookingSelectors.sec),
-        ]);
-
       console.log(
-        `Booking opens in: ${hours}:${minutes}:${seconds}`,
+        `Booking opens in: ` +
+          `${timerState.hours}:` +
+          `${timerState.minutes}:` +
+          timerState.seconds,
       );
 
       return false;
@@ -601,31 +614,13 @@ async function waitForTimer(
     },
   );
 
-  return browser.execute(() => {
-    type BookingTimingWindow = Window & {
-      __playByPointBookingTiming?: {
-        timerDisappearedAtMs?: number;
-      };
-    };
+  if (timerDisappearedAtMs === undefined) {
+    throw new Error(
+      "Booking timer disappeared without a browser timestamp",
+    );
+  }
 
-    const timingWindow = window as BookingTimingWindow;
-    const observedAt =
-      timingWindow.__playByPointBookingTiming
-        ?.timerDisappearedAtMs;
-
-    if (observedAt !== undefined) {
-      return observedAt;
-    }
-
-    const fallbackAt =
-      performance.timeOrigin + performance.now();
-
-    timingWindow.__playByPointBookingTiming = {
-      timerDisappearedAtMs: fallbackAt,
-    };
-
-    return fallbackAt;
-  });
+  return timerDisappearedAtMs;
 }
 
 export async function bookReservationAPI(
@@ -652,10 +647,55 @@ export async function bookReservationAPI(
     "Continuing in the existing booking iframe",
   );
 
-  const timerDisappearedAtMs = await waitForTimer(
-    browser,
-    bookingSelectors.bookingTimer,
+  // Prepare and arm the browser-side requests before the timer disappears.
+  // This keeps WebDriver out of the time-critical dispatch path.
+  const payload = createBookingPayload(
+    desiredTimes,
+    primary,
+    secondary,
   );
+
+  const batchSize =
+    desiredTimes === "7pm-9pm" ||
+    desiredTimes === "9pm-10pm"
+      ? 2
+      : 4;
+  const delayAfterReleaseMs =
+    desiredTimes === "9pm-10pm" ? 500 : 0;
+
+  console.log(
+    `Using booking batch size: ${batchSize}`,
+  );
+
+  if (bookAtEpochMs !== undefined) {
+    console.log(
+      `Booking requests are armed for the synchronized time: ` +
+        new Date(bookAtEpochMs).toISOString(),
+    );
+  } else {
+    console.log(
+      "Booking requests are armed for immediate dispatch when the timer disappears",
+    );
+  }
+
+  if (delayAfterReleaseMs > 0) {
+    console.log(
+      `A ${delayAfterReleaseMs}ms post-release delay is configured`,
+    );
+  }
+
+  await armBookingsForTimerDisappearance(
+    browser,
+    courtHierarchy,
+    payload,
+    batchSize,
+    bookingSelectors.bookingTimer,
+    bookAtEpochMs,
+    delayAfterReleaseMs,
+  );
+
+  const timerDisappearedAtMs =
+    await waitForTimer(browser);
 
   console.log(
     `Booking timer disappeared at ` +
@@ -663,56 +703,34 @@ export async function bookReservationAPI(
       `(${timerDisappearedAtMs.toFixed(3)}) using the browser clock`,
   );
 
-  await waitForSynchronizedBookTime(
+  const results = await waitForArmedBookingResults(
     browser,
-    bookAtEpochMs,
   );
 
-  // Delay 9-10pm bookings by 500ms.
-  if (desiredTimes === "9pm-10pm") {
+  for (const result of results) {
     console.log(
-      "9-10pm booking. Waiting 500ms before API requests.",
+      `Court ${result.court} (API ${result.courtId}) -> ` +
+        `status=${result.status}; ` +
+        `started=${new Date(
+          result.requestStartedAt,
+        ).toISOString()}; ` +
+        `completed=${new Date(
+          result.requestCompletedAt,
+        ).toISOString()}; ` +
+        `duration=${result.durationMs.toFixed(3)}ms`,
     );
 
-    await browser.pause(500);
+    console.log(
+      `Court ${result.court} fetch started ` +
+        `${result.elapsedSinceTimerDisappearedMs.toFixed(3)}ms ` +
+        `after the booking timer disappeared`,
+    );
+
+    console.log(
+      `Court ${result.court} response: ` +
+        JSON.stringify(result.body),
+    );
   }
-
-  // Build one identical payload for every court.
-  const payload = createBookingPayload(
-    desiredTimes,
-    primary,
-    secondary,
-  );
-
-  // console.log("Booking payload:", payload);
-
-  // Use batches of 2 for days with two time periods.
-  // Use batches of 4 for Monday/Tuesday/Thursday.
-  const batchSize =
-    desiredTimes === "7pm-9pm" ||
-    desiredTimes === "9pm-10pm"
-      ? 2
-      : 4;
-
-  console.log(
-    `Using booking batch size: ${batchSize}`,
-  );
-
-  const requestReleaseAt = Date.now();
-
-  console.log(
-    `Launching booking batches at ` +
-      `${new Date(requestReleaseAt).toISOString()} ` +
-      `(${requestReleaseAt})`,
-  );
-
-  const results = await postBookingsInBatches(
-    browser,
-    courtHierarchy,
-    payload,
-    batchSize,
-    timerDisappearedAtMs,
-  );
 
   console.log(
     `All ${results.length} booking requests completed.`,
