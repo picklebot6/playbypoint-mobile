@@ -601,7 +601,8 @@ async function waitForTimer(
       }
 
       if (
-        timerState.timerDisappearedAtMs !== undefined
+        typeof timerState.timerDisappearedAtMs === "number" &&
+        Number.isFinite(timerState.timerDisappearedAtMs)
       ) {
         timerDisappearedAtMs =
           timerState.timerDisappearedAtMs;
@@ -633,7 +634,10 @@ async function waitForTimer(
     },
   );
 
-  if (timerDisappearedAtMs === undefined) {
+  if (
+    typeof timerDisappearedAtMs !== "number" ||
+    !Number.isFinite(timerDisappearedAtMs)
+  ) {
     throw new Error(
       "Booking timer disappeared without a browser timestamp",
     );
