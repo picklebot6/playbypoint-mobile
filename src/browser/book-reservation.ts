@@ -25,6 +25,20 @@ interface ConcurrentBookingResponse extends BookingResponse {
   elapsedSinceTimerDisappearedMs: number;
 }
 
+interface UtcClockCalibration {
+  status: "pending" | "success" | "failed";
+  offsetMs?: number;
+  roundTripMs?: number;
+  source?: string;
+  uncertaintyMs?: number;
+  error?: string;
+}
+
+interface TimerWaitResult {
+  timerDisappearedAtMs: number;
+  utcCalibrationLogged: boolean;
+}
+
 const playerIds: Record<string, number> = {
   "Matt Lim": 883812,
   "Paul Rodriguez": 885123,
@@ -547,11 +561,170 @@ async function waitForArmedBookingResults(
   return state.results;
 }
 
+async function startUtcClockCalibration(
+  browser: Browser,
+): Promise<void> {
+  await browser.execute(() => {
+    type UtcCalibrationWindow = Window & {
+      __playByPointUtcCalibration?: UtcClockCalibration;
+    };
+
+    const calibrationWindow = window as UtcCalibrationWindow;
+    const calibration: UtcClockCalibration = {
+      status: "pending",
+    };
+
+    calibrationWindow.__playByPointUtcCalibration = calibration;
+
+    void (async () => {
+      const requestStartedAt =
+        performance.timeOrigin + performance.now();
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => {
+        controller.abort();
+      }, 5_000);
+
+      try {
+        const response = await fetch(
+          "https://worldtimeapi.org/api/timezone/Etc/UTC",
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+        const responseReceivedAt =
+          performance.timeOrigin + performance.now();
+        const body = (await response.json()) as {
+          utc_datetime?: unknown;
+        };
+        const utcEpochMs = Date.parse(
+          String(body.utc_datetime ?? ""),
+        );
+
+        if (!response.ok || !Number.isFinite(utcEpochMs)) {
+          throw new Error("UTC time service returned no valid UTC timestamp");
+        }
+
+        const roundTripMs =
+          responseReceivedAt - requestStartedAt;
+        const browserMidpointMs =
+          requestStartedAt + roundTripMs / 2;
+
+        calibration.offsetMs =
+          utcEpochMs - browserMidpointMs;
+        calibration.roundTripMs = roundTripMs;
+        calibration.source = "WorldTimeAPI";
+        calibration.uncertaintyMs = roundTripMs / 2;
+        calibration.status = "success";
+      } catch (error) {
+        try {
+          const fallbackStartedAt =
+            performance.timeOrigin + performance.now();
+          const fallbackResponse = await fetch("/", {
+            cache: "no-store",
+            credentials: "same-origin",
+            method: "HEAD",
+          });
+          const fallbackReceivedAt =
+            performance.timeOrigin + performance.now();
+          const serverDateMs = Date.parse(
+            fallbackResponse.headers.get("date") ?? "",
+          );
+
+          if (
+            !fallbackResponse.ok ||
+            !Number.isFinite(serverDateMs)
+          ) {
+            throw new Error(
+              "PlayByPoint did not return a valid UTC Date header",
+            );
+          }
+
+          const roundTripMs =
+            fallbackReceivedAt - fallbackStartedAt;
+          const browserMidpointMs =
+            fallbackStartedAt + roundTripMs / 2;
+
+          calibration.offsetMs =
+            serverDateMs - browserMidpointMs;
+          calibration.roundTripMs = roundTripMs;
+          calibration.source = "PlayByPoint server Date header";
+          // HTTP Date headers have one-second precision.
+          calibration.uncertaintyMs =
+            500 + roundTripMs / 2;
+          calibration.status = "success";
+        } catch (fallbackError) {
+          calibration.error =
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : String(fallbackError);
+          calibration.status = "failed";
+        }
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    })();
+  });
+}
+
+function logUtcClockCalibration(
+  calibration: UtcClockCalibration | null | undefined,
+): boolean {
+  if (calibration?.status === "pending" || !calibration) {
+    return false;
+  }
+
+  if (calibration.status === "failed") {
+    console.log(
+      `UTC clock calibration unavailable: ${calibration.error}`,
+    );
+    return true;
+  }
+
+  const offsetMs = calibration.offsetMs;
+  const roundTripMs = calibration.roundTripMs;
+  const uncertaintyMs = calibration.uncertaintyMs;
+  const source = calibration.source;
+
+  if (
+    typeof offsetMs !== "number" ||
+    typeof roundTripMs !== "number" ||
+    typeof uncertaintyMs !== "number" ||
+    !source
+  ) {
+    console.log("UTC clock calibration returned incomplete data");
+    return true;
+  }
+
+  const direction = offsetMs >= 0 ? "behind" : "ahead of";
+
+  console.log(
+    `Browser clock is ${Math.abs(offsetMs).toFixed(1)}ms ${direction} ` +
+      `UTC (${source}; request round trip: ${roundTripMs.toFixed(1)}ms; ` +
+      `estimated uncertainty: ±${uncertaintyMs.toFixed(1)}ms)`,
+  );
+
+  return true;
+}
+
+async function readUtcClockCalibration(
+  browser: Browser,
+): Promise<UtcClockCalibration | null> {
+  return browser.execute(() =>
+    (
+      window as Window & {
+        __playByPointUtcCalibration?: UtcClockCalibration;
+      }
+    ).__playByPointUtcCalibration ?? null,
+  );
+}
+
 async function waitForTimer(
   browser: Browser,
-): Promise<number> {
+): Promise<TimerWaitResult> {
   let lastLoggedAt = 0;
   let timerDisappearedAtMs: number | undefined;
+  let utcCalibrationLogged = false;
 
   await browser.waitUntil(
     async () => {
@@ -567,8 +740,14 @@ async function waitForTimer(
                 error?: string;
                 timerDisappearedAtMs?: number;
               };
+              __playByPointUtcCalibration?: UtcClockCalibration;
             }
           ).__playByPointBookingDispatch;
+          const utcCalibration = (
+            window as Window & {
+              __playByPointUtcCalibration?: UtcClockCalibration;
+            }
+          ).__playByPointUtcCalibration;
 
           const readText = (partXpath: string) => {
             const node = document.evaluate(
@@ -584,11 +763,14 @@ async function waitForTimer(
 
           return {
             error: dispatchState?.error,
+            browserNowMs:
+              performance.timeOrigin + performance.now(),
             timerDisappearedAtMs:
               dispatchState?.timerDisappearedAtMs,
             hours: readText(hoursXpath),
             minutes: readText(minutesXpath),
             seconds: readText(secondsXpath),
+            utcCalibration,
           };
         },
         bookingSelectors.hr,
@@ -598,6 +780,12 @@ async function waitForTimer(
 
       if (timerState.error) {
         throw new Error(timerState.error);
+      }
+
+      if (!utcCalibrationLogged) {
+        utcCalibrationLogged = logUtcClockCalibration(
+          timerState.utcCalibration,
+        );
       }
 
       if (
@@ -617,11 +805,25 @@ async function waitForTimer(
 
       lastLoggedAt = now;
 
+      const utcOffsetMs =
+        timerState.utcCalibration?.status === "success"
+          ? timerState.utcCalibration.offsetMs
+          : undefined;
+      const utcText =
+        typeof utcOffsetMs === "number" &&
+        typeof timerState.browserNowMs === "number"
+          ? new Date(
+              timerState.browserNowMs + utcOffsetMs,
+            ).toISOString()
+          : timerState.utcCalibration?.status === "failed"
+            ? "unavailable"
+            : "calibrating";
+
       console.log(
         `Booking opens in: ` +
           `${timerState.hours}:` +
           `${timerState.minutes}:` +
-          timerState.seconds,
+          `${timerState.seconds}; UTC is ${utcText}`,
       );
 
       return false;
@@ -643,7 +845,10 @@ async function waitForTimer(
     );
   }
 
-  return timerDisappearedAtMs;
+  return {
+    timerDisappearedAtMs,
+    utcCalibrationLogged,
+  };
 }
 
 export async function bookReservationAPI(
@@ -717,7 +922,12 @@ export async function bookReservationAPI(
     delayAfterReleaseMs,
   );
 
-  const timerDisappearedAtMs =
+  await startUtcClockCalibration(browser);
+
+  const {
+    timerDisappearedAtMs,
+    utcCalibrationLogged,
+  } =
     await waitForTimer(browser);
 
   console.log(
@@ -729,6 +939,12 @@ export async function bookReservationAPI(
   const results = await waitForArmedBookingResults(
     browser,
   );
+
+  if (!utcCalibrationLogged) {
+    logUtcClockCalibration(
+      await readUtcClockCalibration(browser),
+    );
+  }
 
   for (const result of results) {
     console.log(
