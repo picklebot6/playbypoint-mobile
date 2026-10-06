@@ -102,6 +102,14 @@ jobs:
                 "secondary":"E K"
               },
               {
+                "run_id":"7-9pm-Creds-2",
+                "credential_set":"2",
+                "desired_times":"7pm-9pm",
+                "court_hierarchy":"2,9,8,4,3,6,1",
+                "primary":"abraham a",
+                "secondary":"Mandy Che"
+              },
+              {
                 "run_id":"9-10pm-Creds-1",
                 "credential_set":"1",
                 "desired_times":"9pm-10pm",
