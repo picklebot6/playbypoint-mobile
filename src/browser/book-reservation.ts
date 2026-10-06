@@ -22,7 +22,7 @@ interface ConcurrentBookingResponse extends BookingResponse {
   requestStartedAt: number;
   requestCompletedAt: number;
   durationMs: number;
-  elapsedSinceTimerDisappearedMs: number;
+  elapsedSinceReleaseMs: number;
 }
 
 interface UtcClockCalibration {
@@ -35,7 +35,8 @@ interface UtcClockCalibration {
 }
 
 interface TimerWaitResult {
-  timerDisappearedAtMs: number;
+  releaseAtMs: number;
+  releaseReason: "timer" | "utc";
   utcCalibrationLogged: boolean;
 }
 
@@ -260,6 +261,8 @@ async function armBookingsForTimerDisappearance(
           completed: boolean;
           error?: string;
           results: ConcurrentBookingResponse[];
+          releaseAtMs?: number;
+          releaseReason?: "timer" | "utc";
           timerDisappearedAtMs?: number;
         };
       };
@@ -342,14 +345,15 @@ async function armBookingsForTimerDisappearance(
       };
 
       const dispatch = async (
-        timerDisappearedAtMs: number,
+        releaseAtMs: number,
+        releaseReason: "timer" | "utc",
       ) => {
         try {
           const synchronizedReleaseAt =
-            bookAtEpochMs ?? timerDisappearedAtMs;
+            bookAtEpochMs ?? releaseAtMs;
           const releaseAt =
             Math.max(
-              timerDisappearedAtMs,
+              releaseAtMs,
               synchronizedReleaseAt,
             ) + delayAfterReleaseMs;
           const remainingDelayMs = releaseAt - now();
@@ -380,9 +384,9 @@ async function armBookingsForTimerDisappearance(
                   const requestStartedAt =
                     performance.timeOrigin +
                     performance.now();
-                  const elapsedSinceTimerDisappearedMs =
+                  const elapsedSinceReleaseMs =
                     requestStartedAt -
-                    timerDisappearedAtMs;
+                    releaseAtMs;
 
                   try {
                     const response = await fetch(
@@ -415,7 +419,7 @@ async function armBookingsForTimerDisappearance(
                       durationMs:
                         requestCompletedAt -
                         requestStartedAt,
-                      elapsedSinceTimerDisappearedMs,
+                      elapsedSinceReleaseMs,
                     };
                   } catch (error) {
                     const requestCompletedAt =
@@ -436,7 +440,7 @@ async function armBookingsForTimerDisappearance(
                       durationMs:
                         requestCompletedAt -
                         requestStartedAt,
-                      elapsedSinceTimerDisappearedMs,
+                      elapsedSinceReleaseMs,
                     };
                   }
                 },
@@ -457,7 +461,7 @@ async function armBookingsForTimerDisappearance(
       };
 
       const dispatchAfterTimerPaints = async (
-        timerDisappearedAtMs: number,
+        releaseAtMs: number,
       ) => {
         // The first animation frame is scheduled before the next paint. The
         // second runs on the following frame, after Chrome has had a chance
@@ -470,31 +474,75 @@ async function armBookingsForTimerDisappearance(
           });
         });
 
-        await dispatch(timerDisappearedAtMs);
+        await dispatch(releaseAtMs, "timer");
       };
 
-      const releaseWhenTimerDisappears = () => {
-        if (
-          state.timerDisappearedAtMs !== undefined ||
-          timerIsVisible()
-        ) {
+      const nextSevenAmUtcMs = () => {
+        const current = new Date(now());
+        let target = Date.UTC(
+          current.getUTCFullYear(),
+          current.getUTCMonth(),
+          current.getUTCDate(),
+          7,
+          0,
+          0,
+          0,
+        );
+
+        if (target <= now()) {
+          target += 24 * 60 * 60 * 1_000;
+        }
+
+        return target;
+      };
+
+      let observer: MutationObserver | undefined;
+      let utcReleaseTimer: number | undefined;
+
+      const release = (
+        releaseAtMs: number,
+        releaseReason: "timer" | "utc",
+      ) => {
+        if (state.releaseAtMs !== undefined) {
           return false;
         }
 
-        state.timerDisappearedAtMs = now();
-        void dispatchAfterTimerPaints(
-          state.timerDisappearedAtMs,
-        );
+        state.releaseAtMs = releaseAtMs;
+        state.releaseReason = releaseReason;
+
+        if (releaseReason === "timer") {
+          state.timerDisappearedAtMs = releaseAtMs;
+          void dispatchAfterTimerPaints(releaseAtMs);
+        } else {
+          void dispatch(releaseAtMs, releaseReason);
+        }
+
+        if (observer) {
+          observer.disconnect();
+        }
+
+        if (utcReleaseTimer !== undefined) {
+          window.clearTimeout(utcReleaseTimer);
+        }
+
         return true;
+      };
+
+      const releaseWhenTimerDisappears = () => {
+        if (timerIsVisible()) {
+          return false;
+        }
+
+        return release(now(), "timer");
       };
 
       if (releaseWhenTimerDisappears()) {
         return;
       }
 
-      const observer = new MutationObserver(() => {
+      observer = new MutationObserver(() => {
         if (releaseWhenTimerDisappears()) {
-          observer.disconnect();
+          observer?.disconnect();
         }
       });
 
@@ -504,6 +552,11 @@ async function armBookingsForTimerDisappearance(
         childList: true,
         subtree: true,
       });
+
+      const utcReleaseAtMs = nextSevenAmUtcMs();
+      utcReleaseTimer = window.setTimeout(() => {
+        release(utcReleaseAtMs, "utc");
+      }, Math.max(0, utcReleaseAtMs - now()));
     },
     requests,
     payload,
@@ -723,7 +776,8 @@ async function waitForTimer(
   browser: Browser,
 ): Promise<TimerWaitResult> {
   let lastLoggedAt = 0;
-  let timerDisappearedAtMs: number | undefined;
+  let releaseAtMs: number | undefined;
+  let releaseReason: "timer" | "utc" | undefined;
   let utcCalibrationLogged = false;
 
   await browser.waitUntil(
@@ -738,6 +792,8 @@ async function waitForTimer(
             window as Window & {
               __playByPointBookingDispatch?: {
                 error?: string;
+                releaseAtMs?: number;
+                releaseReason?: "timer" | "utc";
                 timerDisappearedAtMs?: number;
               };
               __playByPointUtcCalibration?: UtcClockCalibration;
@@ -765,6 +821,8 @@ async function waitForTimer(
             error: dispatchState?.error,
             browserNowMs:
               performance.timeOrigin + performance.now(),
+            releaseAtMs: dispatchState?.releaseAtMs,
+            releaseReason: dispatchState?.releaseReason,
             timerDisappearedAtMs:
               dispatchState?.timerDisappearedAtMs,
             hours: readText(hoursXpath),
@@ -789,11 +847,13 @@ async function waitForTimer(
       }
 
       if (
-        typeof timerState.timerDisappearedAtMs === "number" &&
-        Number.isFinite(timerState.timerDisappearedAtMs)
+        (timerState.releaseReason === "timer" ||
+          timerState.releaseReason === "utc") &&
+        typeof timerState.releaseAtMs === "number" &&
+        Number.isFinite(timerState.releaseAtMs)
       ) {
-        timerDisappearedAtMs =
-          timerState.timerDisappearedAtMs;
+        releaseAtMs = timerState.releaseAtMs;
+        releaseReason = timerState.releaseReason;
         return true;
       }
 
@@ -837,16 +897,18 @@ async function waitForTimer(
   );
 
   if (
-    typeof timerDisappearedAtMs !== "number" ||
-    !Number.isFinite(timerDisappearedAtMs)
+    typeof releaseAtMs !== "number" ||
+    !Number.isFinite(releaseAtMs) ||
+    (releaseReason !== "timer" && releaseReason !== "utc")
   ) {
     throw new Error(
-      "Booking timer disappeared without a browser timestamp",
+      "Booking release occurred without a browser timestamp",
     );
   }
 
   return {
-    timerDisappearedAtMs,
+    releaseAtMs,
+    releaseReason,
     utcCalibrationLogged,
   };
 }
@@ -902,7 +964,7 @@ export async function bookReservationAPI(
     );
   } else {
     console.log(
-      "Booking requests are armed for immediate dispatch when the timer disappears",
+      "Booking requests are armed for the first of the timer disappearing or 07:00 UTC",
     );
   }
 
@@ -925,16 +987,25 @@ export async function bookReservationAPI(
   await startUtcClockCalibration(browser);
 
   const {
-    timerDisappearedAtMs,
+    releaseAtMs,
+    releaseReason,
     utcCalibrationLogged,
   } =
     await waitForTimer(browser);
 
-  console.log(
-    `Booking timer disappeared at ` +
-      `${new Date(timerDisappearedAtMs).toISOString()} ` +
-      `(${timerDisappearedAtMs.toFixed(3)}) using the browser clock`,
-  );
+  if (releaseReason === "timer") {
+    console.log(
+      `Booking timer disappeared at ` +
+        `${new Date(releaseAtMs).toISOString()} ` +
+        `(${releaseAtMs.toFixed(3)}) using the browser clock`,
+    );
+  } else {
+    console.log(
+      `Booking released at 07:00 UTC: ` +
+        `${new Date(releaseAtMs).toISOString()} ` +
+        `(${releaseAtMs.toFixed(3)}) using the browser clock`,
+    );
+  }
 
   const results = await waitForArmedBookingResults(
     browser,
@@ -961,8 +1032,12 @@ export async function bookReservationAPI(
 
     console.log(
       `Court ${result.court} fetch started ` +
-        `${result.elapsedSinceTimerDisappearedMs.toFixed(3)}ms ` +
-        `after the booking timer disappeared`,
+        `${result.elapsedSinceReleaseMs.toFixed(3)}ms ` +
+        `after the ${
+          releaseReason === "timer"
+            ? "booking timer disappeared"
+            : "07:00 UTC release"
+        }`,
     );
 
     console.log(
