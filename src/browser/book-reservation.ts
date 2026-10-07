@@ -477,20 +477,94 @@ async function armBookingsForTimerDisappearance(
         await dispatch(releaseAtMs, "timer");
       };
 
-      const nextSevenAmUtcMs = () => {
-        const current = new Date(now());
-        let target = Date.UTC(
-          current.getUTCFullYear(),
-          current.getUTCMonth(),
-          current.getUTCDate(),
-          7,
+      const pacificTime = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23",
+      });
+
+      const getPacificParts = (timestampMs: number) => {
+        const parts = pacificTime.formatToParts(
+          new Date(timestampMs),
+        );
+        const part = (type: Intl.DateTimeFormatPartTypes) =>
+          Number(parts.find((item) => item.type === type)?.value);
+
+        return {
+          year: part("year"),
+          month: part("month"),
+          day: part("day"),
+          hour: part("hour"),
+          minute: part("minute"),
+          second: part("second"),
+        };
+      };
+
+      const pacificDateTimeToEpochMs = (
+        year: number,
+        month: number,
+        day: number,
+        hour: number,
+      ) => {
+        const intendedUtcMs = Date.UTC(
+          year,
+          month - 1,
+          day,
+          hour,
           0,
           0,
           0,
         );
+        let timestampMs = intendedUtcMs;
 
-        if (target <= now()) {
-          target += 24 * 60 * 60 * 1_000;
+        // Convert a Pacific wall-clock time into an absolute timestamp,
+        // including the current PST/PDT offset.
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const actual = getPacificParts(timestampMs);
+          const actualAsUtcMs = Date.UTC(
+            actual.year,
+            actual.month - 1,
+            actual.day,
+            actual.hour,
+            actual.minute,
+            actual.second,
+            0,
+          );
+          timestampMs += intendedUtcMs - actualAsUtcMs;
+        }
+
+        return timestampMs;
+      };
+
+      const nextSevenAmPacificMs = () => {
+        const currentMs = now();
+        const current = getPacificParts(currentMs);
+        let target = pacificDateTimeToEpochMs(
+          current.year,
+          current.month,
+          current.day,
+          7,
+        );
+
+        if (target <= currentMs) {
+          const tomorrow = new Date(
+            Date.UTC(
+              current.year,
+              current.month - 1,
+              current.day + 1,
+            ),
+          );
+          target = pacificDateTimeToEpochMs(
+            tomorrow.getUTCFullYear(),
+            tomorrow.getUTCMonth() + 1,
+            tomorrow.getUTCDate(),
+            7,
+          );
         }
 
         return target;
@@ -553,10 +627,10 @@ async function armBookingsForTimerDisappearance(
         subtree: true,
       });
 
-      const utcReleaseAtMs = nextSevenAmUtcMs();
+      const pacificReleaseAtMs = nextSevenAmPacificMs();
       utcReleaseTimer = window.setTimeout(() => {
-        release(utcReleaseAtMs, "utc");
-      }, Math.max(0, utcReleaseAtMs - now()));
+        release(pacificReleaseAtMs, "utc");
+      }, Math.max(0, pacificReleaseAtMs - now()));
     },
     requests,
     payload,
@@ -964,7 +1038,7 @@ export async function bookReservationAPI(
     );
   } else {
     console.log(
-      "Booking requests are armed for the first of the timer disappearing or 07:00 UTC",
+      "Booking requests are armed for the first of the timer disappearing or 07:00 Pacific Time",
     );
   }
 
@@ -1001,7 +1075,7 @@ export async function bookReservationAPI(
     );
   } else {
     console.log(
-      `Booking released at 07:00 UTC: ` +
+      `Booking released at 07:00 Pacific Time: ` +
         `${new Date(releaseAtMs).toISOString()} ` +
         `(${releaseAtMs.toFixed(3)}) using the browser clock`,
     );
@@ -1036,7 +1110,7 @@ export async function bookReservationAPI(
         `after the ${
           releaseReason === "timer"
             ? "booking timer disappeared"
-            : "07:00 UTC release"
+            : "07:00 Pacific Time release"
         }`,
     );
 
