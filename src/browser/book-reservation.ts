@@ -1134,6 +1134,12 @@ export async function bookReservationAPI(
     console.log(
       `Successful booking response(s): ${successful.length}`,
     );
+
+    for (const result of successful) {
+      console.log(
+        `Confirmed booking: Court ${result.court}, ${desiredTimes}`,
+      );
+    }
   } else {
     console.log(
       "No court returned a successful booking response.",
