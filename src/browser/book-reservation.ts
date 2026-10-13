@@ -1015,6 +1015,8 @@ export async function bookReservationAPI(
     playerIds,
   );
 
+  console.log("Booking API payload:", JSON.stringify(payload));
+
   const batchSize =
     desiredTimes === "7pm-9pm" ||
     desiredTimes === "9pm-10pm"
