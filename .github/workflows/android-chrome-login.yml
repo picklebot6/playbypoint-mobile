@@ -87,6 +87,14 @@ jobs:
                 "court_hierarchy":"4,8,9,2,6,1,3",
                 "primary":"Paul Rodriguez",
                 "secondary":"Dexter Dizon"
+              },
+              {
+                "run_id":"730-930pm-Creds-3",
+                "credential_set":"3",
+                "desired_times":"7:30pm-9:30pm",
+                "court_hierarchy":"2,6,1,3,4,8,9",
+                "primary":"Patrick Jung",
+                "secondary":"Khoi Do"
               }
             ]}'
 
@@ -187,6 +195,8 @@ jobs:
       PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
       PLAYBYPOINT_EMAIL_2: ${{ secrets.PLAYBYPOINT_EMAIL_2 }}
       PLAYBYPOINT_PASSWORD_2: ${{ secrets.PLAYBYPOINT_PASSWORD_2 }}
+      PLAYBYPOINT_EMAIL_3: ${{ secrets.PLAYBYPOINT_EMAIL_3 }}
+      PLAYBYPOINT_PASSWORD_3: ${{ secrets.PLAYBYPOINT_PASSWORD_3 }}
       PLAYBYPOINT_CREDENTIAL_SET: ${{ matrix.credential_set }}
       PLAYBYPOINT_DESIRED_TIMES: ${{ matrix.desired_times }}
       PLAYBYPOINT_COURT_HIERARCHY: ${{ matrix.court_hierarchy }}
@@ -194,6 +204,11 @@ jobs:
       PLAYBYPOINT_SECONDARY: ${{ matrix.secondary }}
       PLAYBYPOINT_DAY: ${{ needs.select-runs.outputs.day }}
       PLAYBYPOINT_BOOK_AT_EPOCH_MS: ${{ needs.select-runs.outputs.book_at_epoch_ms }}
+      PLAYBYPOINT_R2_ACCOUNT_ID: ${{ secrets.PLAYBYPOINT_R2_ACCOUNT_ID }}
+      PLAYBYPOINT_R2_BUCKET: ${{ secrets.PLAYBYPOINT_R2_BUCKET }}
+      PLAYBYPOINT_R2_PLAYER_IDS_KEY: ${{ secrets.PLAYBYPOINT_R2_PLAYER_IDS_KEY }}
+      PLAYBYPOINT_R2_ACCESS_KEY_ID: ${{ secrets.PLAYBYPOINT_R2_ACCESS_KEY_ID }}
+      PLAYBYPOINT_R2_SECRET_ACCESS_KEY: ${{ secrets.PLAYBYPOINT_R2_SECRET_ACCESS_KEY }}
       WDIO_LOG_LEVEL: error
       NPM_CONFIG_LOGLEVEL: error
       NODE_NO_WARNINGS: 1

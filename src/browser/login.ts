@@ -97,21 +97,21 @@ async function bookNowIsVisible(browser: Browser): Promise<boolean> {
 
 export async function logInToPlayByPoint(browser: Browser) {
   const day = process.env.PLAYBYPOINT_DAY?.trim();
-  const credentialSet = process.env.PLAYBYPOINT_CREDENTIAL_SET?.trim();
-  const useSecondCredentials = credentialSet
-    ? credentialSet === "2"
-    : day === "Tuesday" || day === "Thursday";
-  const emailVariable = useSecondCredentials
-    ? "PLAYBYPOINT_EMAIL_2"
-    : "PLAYBYPOINT_EMAIL";
-  const passwordVariable = useSecondCredentials
-    ? "PLAYBYPOINT_PASSWORD_2"
-    : "PLAYBYPOINT_PASSWORD";
+  const credentialSet = process.env.PLAYBYPOINT_CREDENTIAL_SET?.trim() ||
+    (day === "Tuesday" || day === "Thursday" ? "2" : "1");
+
+  if (!["1", "2", "3"].includes(credentialSet)) {
+    throw new Error(`Unsupported credential set: ${credentialSet}`);
+  }
+
+  const suffix = credentialSet === "1" ? "" : `_${credentialSet}`;
+  const emailVariable = `PLAYBYPOINT_EMAIL${suffix}`;
+  const passwordVariable = `PLAYBYPOINT_PASSWORD${suffix}`;
   const email = process.env[emailVariable] ?? "";
   const password = process.env[passwordVariable] ?? "";
 
   console.log(
-    `Using ${useSecondCredentials ? "second" : "default"} PlayByPoint credentials${day ? ` for ${day}` : ""}`,
+    `Using PlayByPoint credential set ${credentialSet}${day ? ` for ${day}` : ""}`,
   );
 
   if (!email) {

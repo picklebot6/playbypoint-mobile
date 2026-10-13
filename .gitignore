@@ -3,6 +3,7 @@
 node_modules/
 logs/
 scripts/playbypoint-credentials.local.sh
+scripts/playbypoint-r2.local.sh
 .DS_Store
 *.key
 *.pem

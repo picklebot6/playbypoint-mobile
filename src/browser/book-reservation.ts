@@ -1,6 +1,7 @@
 import type { Browser } from "webdriverio";
 
 import { bookingSelectors } from "./selectors";
+import { loadPlayerIds, type PlayerIds } from "./player-ids";
 
 export type ReservationInputs = {
   courtHierarchy: readonly string[];
@@ -40,32 +41,7 @@ interface TimerWaitResult {
   utcCalibrationLogged: boolean;
 }
 
-const playerIds: Record<string, number> = {
-  "Matt Lim": 883812,
-  "Paul Rodriguez": 885123,
-  "Yena Kim": 1133177,
-  "abraham a": 2413185,
-  "Begi A": 3015281,
-  "Charlee Liu": 976560,
-  "Christina Nguyen": 2303789,
-  "Christopher Hernandez": 869562,
-  "Derek Dang": 3049673,
-  "Dexter Dizon": 850403,
-  "E K": 573064,
-  "Gil Navarro": 669397,
-  "Harrison Yang": 917109,
-  "Irene Chang": 2346948,
-  "Kelli Hernandez": 2491196,
-  "Lia Barnes": 3050120,
-  "Mandy Che": 708715,
-  "Maria Aleman": 876246,
-  "Nate Nget": 3824341,
-  "Shawn Yoo": 4024553,
-  "Tammy Yik": 4219108,
-  "William Kang": 1053057,
-};
-
-function getPlayerId(name: string): number {
+function getPlayerId(name: string, playerIds: PlayerIds): number {
   const id = playerIds[name];
 
   if (id === undefined) {
@@ -167,9 +143,10 @@ function createBookingPayload(
   desiredTime: string,
   primary: string,
   secondary: string,
+  playerIds: PlayerIds,
 ) {
-  const primaryId = getPlayerId(primary);
-  const secondaryId = getPlayerId(secondary);
+  const primaryId = getPlayerId(primary, playerIds);
+  const secondaryId = getPlayerId(secondary, playerIds);
 
   const { hourStart, hourEnd } =
     parseTimeRange(desiredTime);
@@ -931,6 +908,23 @@ async function waitForTimer(
         return true;
       }
 
+      const timerParts = [
+        timerState.hours,
+        timerState.minutes,
+        timerState.seconds,
+      ];
+
+      if (!timerParts.every((part) => /^\d+$/.test(part))) {
+        return false;
+      }
+
+      const [hours, minutes, seconds] = timerParts.map(Number);
+      const remainingSeconds = hours * 3_600 + minutes * 60 + seconds;
+
+      if (remainingSeconds > 10) {
+        return false;
+      }
+
       const now = Date.now();
 
       if (now - lastLoggedAt < 1_000) {
@@ -1013,10 +1007,12 @@ export async function bookReservationAPI(
 
   // Prepare and arm the browser-side requests before the timer disappears.
   // This keeps WebDriver out of the time-critical dispatch path.
+  const playerIds = await loadPlayerIds();
   const payload = createBookingPayload(
     desiredTimes,
     primary,
     secondary,
+    playerIds,
   );
 
   const batchSize =
@@ -1025,7 +1021,10 @@ export async function bookReservationAPI(
       ? 2
       : 4;
   const delayAfterReleaseMs =
-    desiredTimes === "9pm-10pm" ? 500 : 0;
+    process.env.PLAYBYPOINT_CREDENTIAL_SET?.trim() === "3" ||
+    desiredTimes === "9pm-10pm"
+      ? 500
+      : 0;
 
   console.log(
     `Using booking batch size: ${batchSize}`,

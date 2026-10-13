@@ -5,8 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "android-chrome-login": "bash -c 'source scripts/playbypoint-credentials.local.sh && export PLAYBYPOINT_EMAIL PLAYBYPOINT_PASSWORD PLAYBYPOINT_EMAIL_2 PLAYBYPOINT_PASSWORD_2 && npx tsx scripts/android-chrome-login.ts'",
-    "main": "bash -c 'source scripts/playbypoint-credentials.local.sh && export PLAYBYPOINT_EMAIL PLAYBYPOINT_PASSWORD PLAYBYPOINT_EMAIL_2 PLAYBYPOINT_PASSWORD_2 && tsx src/browser/main.ts'"
+    "main": "bash -c 'source scripts/playbypoint-credentials.local.sh && export PLAYBYPOINT_EMAIL PLAYBYPOINT_PASSWORD PLAYBYPOINT_EMAIL_2 PLAYBYPOINT_PASSWORD_2 PLAYBYPOINT_EMAIL_3 PLAYBYPOINT_PASSWORD_3 && if [ -f scripts/playbypoint-r2.local.sh ]; then set -a; source scripts/playbypoint-r2.local.sh || exit; set +a; fi && tsx src/browser/main.ts'"
   },
   "keywords": [],
   "author": "",
@@ -17,5 +16,8 @@
     "appium-uiautomator2-driver": "^8.5.2",
     "tsx": "^4.23.13",
     "webdriverio": "^9.31.5"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1150.0"
   }
 }
