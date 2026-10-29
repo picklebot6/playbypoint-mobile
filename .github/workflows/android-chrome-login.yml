@@ -110,6 +110,14 @@ jobs:
 
             matrix='{"include":[
               {
+                "run_id":"6-8pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"6pm-8pm",
+                "court_hierarchy":"2,8,6,10,5,9,4",
+                "primary":"Begi A",
+                "secondary":"Shawn Yoo"
+              },
+              {
                 "run_id":"8-10pm-Creds-1",
                 "credential_set":"1",
                 "desired_times":"8pm-10pm",
@@ -159,6 +167,14 @@ jobs:
           elif [[ "$day" == "Thursday" ]]; then
 
             matrix='{"include":[
+              {
+                "run_id":"6-8pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"6pm-8pm",
+                "court_hierarchy":"2,8,6,10,5,9,4",
+                "primary":"Shawn Yoo",
+                "secondary":"Tammy Yik"
+              },
               {
                 "run_id":"8-10pm-Creds-1",
                 "credential_set":"1",
