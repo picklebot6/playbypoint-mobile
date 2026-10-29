@@ -1025,7 +1025,7 @@ export async function bookReservationAPI(
 
   const day = process.env.PLAYBYPOINT_DAY?.trim();
   const isWeekend = day === "Saturday" || day === "Sunday";
-  const batchSize = isWeekend ? 3 : pairingCount >= 2 ? 2 : 4;
+  const batchSize = isWeekend ? 2 : pairingCount >= 2 ? 2 : 4;
   const delayAfterReleaseMs =
     process.env.PLAYBYPOINT_CREDENTIAL_SET?.trim() === "3"
       ? 1000
