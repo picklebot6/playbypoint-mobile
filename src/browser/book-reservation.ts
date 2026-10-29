@@ -1015,19 +1015,24 @@ export async function bookReservationAPI(
     playerIds,
   );
 
-  const batchSize =
-    desiredTimes === "7pm-9pm" ||
-    desiredTimes === "9pm-10pm"
-      ? 2
-      : 4;
+  const pairingCount = Number(
+    process.env.PLAYBYPOINT_PAIRING_COUNT?.trim() || "1",
+  );
+
+  if (!Number.isSafeInteger(pairingCount) || pairingCount < 1) {
+    throw new Error("PLAYBYPOINT_PAIRING_COUNT must be a positive integer");
+  }
+
+  const day = process.env.PLAYBYPOINT_DAY?.trim();
+  const isWeekend = day === "Saturday" || day === "Sunday";
+  const batchSize = isWeekend ? 3 : pairingCount >= 2 ? 2 : 4;
   const delayAfterReleaseMs =
-    process.env.PLAYBYPOINT_CREDENTIAL_SET?.trim() === "3" ||
-    desiredTimes === "9pm-10pm"
-      ? 500
+    process.env.PLAYBYPOINT_CREDENTIAL_SET?.trim() === "3"
+      ? 1000
       : 0;
 
   console.log(
-    `Using booking batch size: ${batchSize}`,
+    `Using booking batch size: ${batchSize} (${pairingCount} pairing(s) for this credential set)`,
   );
 
   if (bookAtEpochMs !== undefined) {

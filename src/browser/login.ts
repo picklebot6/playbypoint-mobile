@@ -100,7 +100,7 @@ export async function logInToPlayByPoint(browser: Browser) {
   const credentialSet = process.env.PLAYBYPOINT_CREDENTIAL_SET?.trim() ||
     (day === "Tuesday" || day === "Thursday" ? "2" : "1");
 
-  if (!["1", "2", "3"].includes(credentialSet)) {
+  if (!["1", "2", "3", "4"].includes(credentialSet)) {
     throw new Error(`Unsupported credential set: ${credentialSet}`);
   }
 

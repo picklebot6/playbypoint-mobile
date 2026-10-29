@@ -77,37 +77,53 @@ jobs:
 
             echo "Five-run synchronized test will release at epoch ${book_at_epoch_ms}ms"
 
-          elif [[ "$day" == "Tuesday" ]]; then
+          elif [[ "$day" == "Monday" ]]; then
 
             matrix='{"include":[
               {
-                "run_id":"730-930pm-Creds-1",
+                "run_id":"6-8pm-Creds-1",
                 "credential_set":"1",
-                "desired_times":"7:30pm-9:30pm",
-                "court_hierarchy":"4,8,9,2,6,1,3",
-                "primary":"Paul Rodriguez",
-                "secondary":"Dexter Dizon"
-              }
-            ]}'
-
-          elif [[ "$day" == "Monday" || "$day" == "Thursday" ]]; then
-
-            matrix='{"include":[
+                "desired_times":"6pm-8pm",
+                "court_hierarchy":"3,1,2,9,8,10,5,6,7,4",
+                "primary":"Yena Kim",
+                "secondary":"Begi A"
+              },
               {
-                "run_id":"730-930pm-Creds-1",
+                "run_id":"8-10pm-Creds-1",
                 "credential_set":"1",
-                "desired_times":"7:30pm-9:30pm",
-                "court_hierarchy":"4,8,9,2,6,1,3",
-                "primary":"Paul Rodriguez",
-                "secondary":"Dexter Dizon"
+                "desired_times":"8pm-10pm",
+                "court_hierarchy":"3,2,9,8,1,10,5,6,7,4",
+                "primary":"E K",
+                "secondary":"Charlee Liu"
               },
               {
                 "run_id":"7-9pm-Creds-3",
                 "credential_set":"3",
                 "desired_times":"7pm-9pm",
-                "court_hierarchy":"2,6,1,3,4,8,9",
+                "court_hierarchy":"6,4,10,5,7",
                 "primary":"Patrick Jung",
                 "secondary":"Khoi Do"
+              }
+            ]}'
+
+          elif [[ "$day" == "Tuesday" ]]; then
+
+            matrix='{"include":[
+              {
+                "run_id":"8-10pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"8pm-10pm",
+                "court_hierarchy":"8,2,6,10,5,7,9,4",
+                "primary":"Mitch Kim",
+                "secondary":"rony heng"
+              },
+              {
+                "run_id":"730-930pm-Creds-4",
+                "credential_set":"4",
+                "desired_times":"7:30pm-9:30pm",
+                "court_hierarchy":"4,9,2,8,6,10,5,7",
+                "primary":"Paul Rodriguez",
+                "secondary":"Dexter Dizon"
               }
             ]}'
 
@@ -115,49 +131,99 @@ jobs:
 
             matrix='{"include":[
               {
-                "run_id":"7-9pm-Creds-1",
+                "run_id":"6-8pm-Creds-1",
                 "credential_set":"1",
-                "desired_times":"7pm-9pm",
-                "court_hierarchy":"4,8,9,2,3,6,1",
+                "desired_times":"6pm-8pm",
+                "court_hierarchy":"4,2,9,8,3,1,10,5,6,7",
                 "primary":"Yena Kim",
-                "secondary":"E K"
+                "secondary":"Begi A"
               },
               {
                 "run_id":"7-9pm-Creds-3",
                 "credential_set":"3",
                 "desired_times":"7pm-9pm",
-                "court_hierarchy":"2,6,1,3,4,8,9",
+                "court_hierarchy":"6,1,10,5,7",
                 "primary":"Patrick Jung",
                 "secondary":"Khoi Do"
               },
               {
-                "run_id":"9-10pm-Creds-1",
+                "run_id":"8-10pm-Creds-1",
                 "credential_set":"1",
-                "desired_times":"9pm-10pm",
-                "court_hierarchy":"4,8,9,2,3,6,1",
-                "primary":"Derek Dang",
-                "secondary":"Lia Barnes"
+                "desired_times":"8pm-10pm",
+                "court_hierarchy":"3,4,2,9,8,1,10,5,6,7",
+                "primary":"E K",
+                "secondary":"Charlee Liu"
               }
             ]}'
 
-          elif [[ "$day" == "Saturday" || "$day" == "Sunday" ]]; then
+          elif [[ "$day" == "Thursday" ]]; then
 
             matrix='{"include":[
               {
-                "run_id":"7-9pm-Creds-1",
+                "run_id":"8-10pm-Creds-1",
                 "credential_set":"1",
-                "desired_times":"7pm-9pm",
-                "court_hierarchy":"4,3,2,1,5",
-                "primary":"Yena Kim",
-                "secondary":"Matt Lim"
+                "desired_times":"8pm-10pm",
+                "court_hierarchy":"8,2,6,10,5,7,9,4",
+                "primary":"Johan Halim",
+                "secondary":"Wilmer Salvador"
               },
               {
-                "run_id":"9-10pm-Creds-1",
+                "run_id":"730-930pm-Creds-4",
+                "credential_set":"4",
+                "desired_times":"7:30pm-9:30pm",
+                "court_hierarchy":"4,9,2,8,6,10,5,7",
+                "primary":"Paul Rodriguez",
+                "secondary":"Dexter Dizon"
+              },
+              {
+                "run_id":"7-9pm-Creds-3",
+                "credential_set":"3",
+                "desired_times":"7pm-9pm",
+                "court_hierarchy":"1,3,5,7",
+                "primary":"Patrick Jung",
+                "secondary":"Khoi Do"
+              }
+            ]}'
+
+          elif [[ "$day" == "Saturday" ]]; then
+
+            matrix='{"include":[
+              {
+                "run_id":"6-8pm-Creds-1",
                 "credential_set":"1",
-                "desired_times":"9pm-10pm",
-                "court_hierarchy":"4,3,2,1,5",
-                "primary":"Harrison Yang",
-                "secondary":"Charlee Liu"
+                "desired_times":"6pm-8pm",
+                "court_hierarchy":"3,4,2,1,5",
+                "primary":"Yena Kim",
+                "secondary":"Harrison Yang"
+              },
+              {
+                "run_id":"8-10pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"8pm-10pm",
+                "court_hierarchy":"3,4,2,1,5",
+                "primary":"Matt Lim",
+                "secondary":"E K"
+              }
+            ]}'
+
+          elif [[ "$day" == "Sunday" ]]; then
+
+            matrix='{"include":[
+              {
+                "run_id":"6-8pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"6pm-8pm",
+                "court_hierarchy":"4,2,3,1,5",
+                "primary":"Yena Kim",
+                "secondary":"Harrison Yang"
+              },
+              {
+                "run_id":"8-10pm-Creds-1",
+                "credential_set":"1",
+                "desired_times":"8pm-10pm",
+                "court_hierarchy":"4,2,3,1,5",
+                "primary":"Matt Lim",
+                "secondary":"E K"
               }
             ]}'
 
@@ -179,6 +245,14 @@ jobs:
             echo "No booking runs are configured for $day"
 
           fi
+
+          matrix=$(jq '
+            .include as $runs |
+            .include |= map(
+              .credential_set as $credentials |
+              .pairing_count = ([$runs[] | select(.credential_set == $credentials)] | length)
+            )
+          ' <<< "$matrix")
 
           echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
 
@@ -210,7 +284,10 @@ jobs:
       PLAYBYPOINT_PASSWORD_2: ${{ secrets.PLAYBYPOINT_PASSWORD_2 }}
       PLAYBYPOINT_EMAIL_3: ${{ secrets.PLAYBYPOINT_EMAIL_3 }}
       PLAYBYPOINT_PASSWORD_3: ${{ secrets.PLAYBYPOINT_PASSWORD_3 }}
+      PLAYBYPOINT_EMAIL_4: ${{ secrets.PLAYBYPOINT_EMAIL_4 }}
+      PLAYBYPOINT_PASSWORD_4: ${{ secrets.PLAYBYPOINT_PASSWORD_4 }}
       PLAYBYPOINT_CREDENTIAL_SET: ${{ matrix.credential_set }}
+      PLAYBYPOINT_PAIRING_COUNT: ${{ matrix.pairing_count }}
       PLAYBYPOINT_DESIRED_TIMES: ${{ matrix.desired_times }}
       PLAYBYPOINT_COURT_HIERARCHY: ${{ matrix.court_hierarchy }}
       PLAYBYPOINT_PRIMARY: ${{ matrix.primary }}
