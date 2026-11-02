@@ -425,6 +425,16 @@ async function armBookingsForTimerDisappearance(
             );
 
             state.results.push(...batchResults);
+
+            if (batchResults.some((result) => {
+              const body = result.body as {
+                location?: { status?: string; id?: number };
+              } | null;
+              return result.ok && body?.location?.status === "booked" &&
+                body.location.id != null;
+            })) {
+              break;
+            }
           }
 
           state.completed = true;
@@ -1125,13 +1135,18 @@ export async function bookReservationAPI(
   }
 
   console.log(
-    `All ${results.length} booking requests completed.`,
+    `${results.length} booking requests completed; ` +
+      `${courtHierarchy.length - results.length} courts not attempted.`,
   );
 
   const successful = results.filter(
-    (result) =>
-      result.status >= 200 &&
-      result.status < 300,
+    (result) => {
+      const body = result.body as {
+        location?: { status?: string; id?: number };
+      } | null;
+      return result.ok && body?.location?.status === "booked" &&
+        body.location.id != null;
+    },
   );
 
   if (successful.length > 0) {

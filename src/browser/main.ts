@@ -2,7 +2,6 @@ import { remote, type Browser } from "webdriverio";
 
 import {
   androidChromeOptions,
-  errorPauseMs,
   screenshotPath,
 } from "./config";
 import { logInToPlayByPoint } from "./login";
@@ -222,9 +221,14 @@ export async function runBrowserWorkflow(
   let shuttingDown = false;
 
   const closeSession = () => {
-    sessionCleanup ??= browser.deleteSession().then(() => {
-      console.log("Appium session closed");
-    });
+    sessionCleanup ??= Promise.resolve()
+      .then(() => browser.deleteSession())
+      .then(() => {
+        console.log("Appium session closed");
+      })
+      .catch((error) => {
+        console.warn("Failed to close the Appium session (cleanup warning):", error);
+      });
     return sessionCleanup;
   };
 
@@ -260,14 +264,10 @@ export async function runBrowserWorkflow(
       console.log(`Completed workflow step: ${step.name}`);
     }
   } catch (error) {
-    console.error(
-      `Workflow failed. Leaving the browser open for ${errorPauseMs / 1000} seconds...`,
-    );
+    console.error("Workflow failed:", error);
     throw error;
   } finally {
     try {
-      await pause();
-
       try {
         await browser.switchFrame(null);
         await browser.saveScreenshot(screenshotPath);
@@ -275,10 +275,17 @@ export async function runBrowserWorkflow(
       } catch (screenshotError) {
         console.error("Failed to save the final screenshot:", screenshotError);
       }
+
+      if (input.isTTY && !process.env.CI) {
+        await pause();
+      }
     } finally {
-      await closeSession();
-      process.removeListener("SIGINT", handleInterrupt);
-      process.removeListener("SIGTERM", handleTermination);
+      try {
+        await closeSession();
+      } finally {
+        process.removeListener("SIGINT", handleInterrupt);
+        process.removeListener("SIGTERM", handleTermination);
+      }
     }
   }
 }
