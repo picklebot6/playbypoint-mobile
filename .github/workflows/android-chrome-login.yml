@@ -85,16 +85,16 @@ jobs:
                 "credential_set":"1",
                 "desired_times":"6pm-8pm",
                 "court_hierarchy":"3,1,2,9,8,10,5,6,7,4",
-                "primary":"Yena Kim",
+                "primary":"Charlee Liu",
                 "secondary":"Begi A"
               },
               {
-                "run_id":"8-10pm-Creds-1",
-                "credential_set":"1",
+                "run_id":"8-10pm-Creds-2",
+                "credential_set":"2",
                 "desired_times":"8pm-10pm",
                 "court_hierarchy":"3,2,9,8,1,10,5,6,7,4",
-                "primary":"E K",
-                "secondary":"Charlee Liu"
+                "primary":"Tammy Yik",
+                "secondary":"Matt Lim"
               },
               {
                 "run_id":"7-9pm-Creds-3",
@@ -113,13 +113,13 @@ jobs:
                 "run_id":"6-8pm-Creds-1",
                 "credential_set":"1",
                 "desired_times":"6pm-8pm",
-                "court_hierarchy":"2,8,6,10,5,9,4",
-                "primary":"Begi A",
-                "secondary":"Shawn Yoo"
+                "court_hierarchy":"2,1,9,10,5,6,7",
+                "primary":"Yena Kim",
+                "secondary":"E K"
               },
               {
-                "run_id":"8-10pm-Creds-1",
-                "credential_set":"1",
+                "run_id":"8-10pm-Creds-2",
+                "credential_set":"2",
                 "desired_times":"8pm-10pm",
                 "court_hierarchy":"8,2,6,10,5,7,9,4",
                 "primary":"Mitch Kim",
@@ -142,8 +142,8 @@ jobs:
                 "run_id":"6-8pm-Creds-1",
                 "credential_set":"1",
                 "desired_times":"6pm-8pm",
-                "court_hierarchy":"4,2,9,8,3,1,10,5,6,7",
-                "primary":"Yena Kim",
+                "court_hierarchy":"3,4,2,9,8,1,10,5,6,7",
+                "primary":"Charlee Liu",
                 "secondary":"Begi A"
               },
               {
@@ -155,12 +155,12 @@ jobs:
                 "secondary":"Khoi Do"
               },
               {
-                "run_id":"8-10pm-Creds-1",
-                "credential_set":"1",
+                "run_id":"8-10pm-Creds-2",
+                "credential_set":"2",
                 "desired_times":"8pm-10pm",
                 "court_hierarchy":"3,4,2,9,8,1,10,5,6,7",
-                "primary":"E K",
-                "secondary":"Charlee Liu"
+                "primary":"rony heng",
+                "secondary":"Mitch Kim"
               }
             ]}'
 
@@ -172,15 +172,15 @@ jobs:
                 "credential_set":"1",
                 "desired_times":"6pm-8pm",
                 "court_hierarchy":"2,8,6,10,5,9,4",
-                "primary":"Shawn Yoo",
-                "secondary":"Tammy Yik"
+                "primary":"Yena Kim",
+                "secondary":"E K"
               },
               {
-                "run_id":"8-10pm-Creds-1",
-                "credential_set":"1",
+                "run_id":"8-10pm-Creds-2",
+                "credential_set":"2",
                 "desired_times":"8pm-10pm",
                 "court_hierarchy":"8,2,6,10,5,7,9,4",
-                "primary":"Johan Halim",
+                "primary":"Matt Lim",
                 "secondary":"Wilmer Salvador"
               },
               {
@@ -213,12 +213,12 @@ jobs:
                 "secondary":"Harrison Yang"
               },
               {
-                "run_id":"8-10pm-Creds-1",
-                "credential_set":"1",
+                "run_id":"8-10pm-Creds-2",
+                "credential_set":"2",
                 "desired_times":"8pm-10pm",
                 "court_hierarchy":"3,4,2,1,5",
                 "primary":"Matt Lim",
-                "secondary":"E K"
+                "secondary":"Tammy Yik"
               }
             ]}'
 
@@ -234,12 +234,12 @@ jobs:
                 "secondary":"Harrison Yang"
               },
               {
-                "run_id":"8-10pm-Creds-1",
-                "credential_set":"1",
+                "run_id":"8-10pm-Creds-2",
+                "credential_set":"2",
                 "desired_times":"8pm-10pm",
                 "court_hierarchy":"4,2,3,1,5",
                 "primary":"Matt Lim",
-                "secondary":"E K"
+                "secondary":"Charlee Liu"
               }
             ]}'
 
