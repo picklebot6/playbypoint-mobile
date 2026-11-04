@@ -181,7 +181,7 @@ jobs:
                 "desired_times":"8pm-10pm",
                 "court_hierarchy":"8,2,6,10,5,7,9,4",
                 "primary":"Matt Lim",
-                "secondary":"Wilmer Salvador"
+                "secondary":"Tammy Yik"
               },
               {
                 "run_id":"730-930pm-Creds-4",
@@ -218,7 +218,7 @@ jobs:
                 "desired_times":"8pm-10pm",
                 "court_hierarchy":"3,4,2,1,5",
                 "primary":"Matt Lim",
-                "secondary":"Tammy Yik"
+                "secondary":"Wilmer Salvador"
               }
             ]}'
 
