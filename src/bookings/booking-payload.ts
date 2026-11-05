@@ -43,9 +43,5 @@ export async function logBookingPayloads(bookings: ActiveBooking[]) {
   }
   const playerIds = await loadPlayerIds();
   const requests = bookings.map(booking => reservationToBookingRequest(booking, playerIds));
-  for (const request of requests) {
-    console.log(`Booking request preview for ${request.sourceReference}:`);
-    console.log(JSON.stringify(request, null, 2));
-  }
   return requests;
 }

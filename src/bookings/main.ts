@@ -13,6 +13,11 @@ import { resumeSavedTransfer } from "./resume";
 let phase = "credential validation";
 
 async function main() {
+  const day = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "long" }).format(new Date());
+  if (day === "Friday") {
+    console.log("Friday in America/Los_Angeles; skipping the transfer workflow.");
+    return;
+  }
   if (process.argv.includes("--resume")) {
     phase = "resuming the saved transfer under cred 1";
     await resumeSavedTransfer();
@@ -98,8 +103,6 @@ async function main() {
     entry.status = "rebooked";
     await saveTransferPlan(plan);
     console.log(`Rebooked ${entry.request.sourceReference} as reservation ${entry.replacementReservationId} under cred 1.`);
-    await browser.deleteSession();
-    browser = undefined;
   } finally {
     process.env.PLAYBYPOINT_CREDENTIAL_SET = credentialSet;
     if (browser) await browser.deleteSession().catch(() => console.warn("Browser cleanup failed; preserving the transfer result."));

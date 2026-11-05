@@ -65,9 +65,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-day:
+    runs-on: ubuntu-24.04
+    outputs:
+      should_run: ${{ steps.day.outputs.should_run }}
+    steps:
+      - name: Skip Fridays in Pacific time
+        id: day
+        shell: bash
+        run: |
+          if [[ "$(TZ=America/Los_Angeles date +%A)" == "Friday" ]]; then
+            echo "Friday in America/Los_Angeles; skipping the transfer workflow."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
   lookup:
+    needs: check-day
+    if: ${{ needs.check-day.outputs.should_run == 'true' }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     outputs:
       active_count: ${{ steps.lookup.outputs.active_count }}
       target_date: ${{ steps.lookup.outputs.target_date }}
@@ -88,6 +105,12 @@ jobs:
       PLAYBYPOINT_R2_ACCESS_KEY_ID: ${{ secrets.PLAYBYPOINT_R2_ACCESS_KEY_ID }}
       PLAYBYPOINT_R2_SECRET_ACCESS_KEY: ${{ secrets.PLAYBYPOINT_R2_SECRET_ACCESS_KEY }}
     steps:
+      - name: Random delay of 0–15 minutes
+        shell: bash
+        run: |
+          delay_seconds=$(python3 -c 'import secrets; print(secrets.randbelow(901))')
+          echo "Waiting ${delay_seconds} seconds before starting the transfer workflow."
+          sleep "$delay_seconds"
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
