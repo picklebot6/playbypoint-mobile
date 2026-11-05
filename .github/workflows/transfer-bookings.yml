@@ -1,4 +1,4 @@
-name: transfer-bookings
+name: Run Transfer Booking
 # To call from another workflow job:
 #   uses: ./.github/workflows/transfer-bookings.yml
 #   with:
