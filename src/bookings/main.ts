@@ -1,6 +1,5 @@
 import type { Browser } from "webdriverio";
-import { logInToPlayByPoint } from "../browser/login";
-import { openFreshBrowser } from "../browser/fresh-browser";
+import { BrowserLoginError, logInWithFreshBrowser } from "../browser/login-fresh-browser";
 import { bookSavedReservationWithRetries, RebookingError } from "../browser/book-saved-reservation";
 import { fetchActiveBookings } from "../browser/fetch-active-bookings";
 import { clearBookingReport, createBookingReport, saveBookingReport } from "./report";
@@ -36,10 +35,10 @@ async function main() {
   console.log(`Starting booking lookup for credential set ${credentialSet}.`);
   phase = "Android Chrome startup";
   let browser: Browser | undefined;
+  let plan: ReturnType<typeof createTransferPlan> | undefined;
   try {
-    browser = await openFreshBrowser();
     phase = "login";
-    await logInToPlayByPoint(browser);
+    browser = await logInWithFreshBrowser(credentialSet);
     phase = "fetching active bookings";
     const activeBookings = await fetchActiveBookings(browser);
     const report = createBookingReport(activeBookings, credentialSet);
@@ -59,7 +58,7 @@ async function main() {
     }
     phase = "constructing booking payloads";
     const requests = await logBookingPayloads([booking]);
-    const plan = createTransferPlan(credentialSet, report.targetDate, requests);
+    plan = createTransferPlan(credentialSet, report.targetDate, requests);
     phase = "storing replacement payloads";
     await saveTransferPlan(plan);
 
@@ -80,12 +79,11 @@ async function main() {
     await saveTransferPlan(plan);
     console.log(`Cancelled ${entry.request.sourceReference}; replacement payload saved in reports/transfer-bookings.json.`);
 
-    phase = "closing the source browser and logging in with cred 1";
-    await browser.deleteSession();
+    phase = "closing the source browser";
+    await browser.deleteSession().catch(() => console.warn("Source session cleanup failed; Chrome will be stopped before cred 1 login."));
     browser = undefined;
-    process.env.PLAYBYPOINT_CREDENTIAL_SET = "1";
-    browser = await openFreshBrowser();
-    await logInToPlayByPoint(browser);
+    phase = "logging in with cred 1 in a fresh browser";
+    browser = await logInWithFreshBrowser("1");
     phase = "opening the cred 1 booking form";
     await navigateToBooking(browser);
     phase = `rebooking reservation ${entry.request.sourceReference} with cred 1`;
@@ -103,6 +101,12 @@ async function main() {
     entry.status = "rebooked";
     await saveTransferPlan(plan);
     console.log(`Rebooked ${entry.request.sourceReference} as reservation ${entry.replacementReservationId} under cred 1.`);
+  } catch (error) {
+    if (plan?.bookings[0] && error instanceof BrowserLoginError) {
+      plan.bookings[0].lastError = error.message;
+      await saveTransferPlan(plan).catch(() => console.warn("Could not save login failure details; the existing payload is preserved."));
+    }
+    throw error;
   } finally {
     process.env.PLAYBYPOINT_CREDENTIAL_SET = credentialSet;
     if (browser) await browser.deleteSession().catch(() => console.warn("Browser cleanup failed; preserving the transfer result."));
@@ -113,7 +117,7 @@ if (require.main === module) {
   main().catch(error => {
     // Do not dump WebDriver errors: they can include credential-bearing commands.
     console.error(`Booking lookup failed during ${phase}. Check credentials, browser/network availability, and reservation page format.`);
-    if (error instanceof BookingPayloadError || error instanceof RebookingError) console.error(error.message);
+    if (error instanceof BookingPayloadError || error instanceof RebookingError || error instanceof BrowserLoginError) console.error(error.message);
     process.exitCode = 1;
   });
 }

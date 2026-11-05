@@ -1,5 +1,4 @@
-import { logInToPlayByPoint } from "../browser/login";
-import { openFreshBrowser } from "../browser/fresh-browser";
+import { BrowserLoginError, logInWithFreshBrowser } from "../browser/login-fresh-browser";
 import { navigateToBooking } from "../browser/navigate-to-booking";
 import { fetchActiveBookings } from "../browser/fetch-active-bookings";
 import { bookSavedReservationWithRetries, RebookingError } from "../browser/book-saved-reservation";
@@ -25,8 +24,7 @@ export async function resumeSavedTransfer() {
   process.env.PLAYBYPOINT_CREDENTIAL_SET = "1";
   let browser: Browser | undefined;
   try {
-    browser = await openFreshBrowser();
-    await logInToPlayByPoint(browser);
+    browser = await logInWithFreshBrowser("1");
     const existing = await fetchActiveBookings(browser);
     const playerIds = await loadPlayerIds();
     const wanted = entry.request;
@@ -56,7 +54,7 @@ export async function resumeSavedTransfer() {
     console.log(`Rebooked saved reservation as ${replacement.reservationId} under cred 1.`);
   } catch (error) {
     entry.status = "failed_or_unknown";
-    if (error instanceof RebookingError) entry.lastError = error.message;
+    if (error instanceof RebookingError || error instanceof BrowserLoginError) entry.lastError = error.message;
     await saveTransferPlan(plan);
     throw error;
   } finally {
