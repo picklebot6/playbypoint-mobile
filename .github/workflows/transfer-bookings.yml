@@ -1,0 +1,124 @@
+name: transfer-bookings
+# To call from another workflow job:
+#   uses: ./.github/workflows/transfer-bookings.yml
+#   with:
+#     credential_set: "2"
+#   secrets: inherit
+
+on:
+  workflow_dispatch:
+    inputs:
+      credential_set:
+        description: Source account credentials (destination is cred 1)
+        type: choice
+        options: ["2", "3", "4"]
+        default: "2"
+  workflow_call:
+    inputs:
+      credential_set:
+        description: Source account credentials (2–4; destination is cred 1)
+        type: string
+        default: "2"
+    secrets:
+      PLAYBYPOINT_EMAIL:
+        required: false
+      PLAYBYPOINT_PASSWORD:
+        required: false
+      PLAYBYPOINT_EMAIL_2:
+        required: false
+      PLAYBYPOINT_PASSWORD_2:
+        required: false
+      PLAYBYPOINT_EMAIL_3:
+        required: false
+      PLAYBYPOINT_PASSWORD_3:
+        required: false
+      PLAYBYPOINT_EMAIL_4:
+        required: false
+      PLAYBYPOINT_PASSWORD_4:
+        required: false
+      PLAYBYPOINT_R2_ACCOUNT_ID:
+        required: false
+      PLAYBYPOINT_R2_BUCKET:
+        required: false
+      PLAYBYPOINT_R2_PLAYER_IDS_KEY:
+        required: false
+      PLAYBYPOINT_R2_ACCESS_KEY_ID:
+        required: false
+      PLAYBYPOINT_R2_SECRET_ACCESS_KEY:
+        required: false
+    outputs:
+      active_count:
+        description: Number of reservations with booked status
+        value: ${{ jobs.lookup.outputs.active_count }}
+      target_date:
+        description: Reservation date one week from today in Pacific time
+        value: ${{ jobs.lookup.outputs.target_date }}
+      target_count:
+        description: Number of booked reservations for the target date
+        value: ${{ jobs.lookup.outputs.target_count }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: transfer-bookings
+  cancel-in-progress: false
+
+jobs:
+  lookup:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    outputs:
+      active_count: ${{ steps.lookup.outputs.active_count }}
+      target_date: ${{ steps.lookup.outputs.target_date }}
+      target_count: ${{ steps.lookup.outputs.target_count }}
+    env:
+      PLAYBYPOINT_CREDENTIAL_SET: ${{ inputs.credential_set }}
+      PLAYBYPOINT_EMAIL: ${{ secrets.PLAYBYPOINT_EMAIL }}
+      PLAYBYPOINT_PASSWORD: ${{ secrets.PLAYBYPOINT_PASSWORD }}
+      PLAYBYPOINT_EMAIL_2: ${{ secrets.PLAYBYPOINT_EMAIL_2 }}
+      PLAYBYPOINT_PASSWORD_2: ${{ secrets.PLAYBYPOINT_PASSWORD_2 }}
+      PLAYBYPOINT_EMAIL_3: ${{ secrets.PLAYBYPOINT_EMAIL_3 }}
+      PLAYBYPOINT_PASSWORD_3: ${{ secrets.PLAYBYPOINT_PASSWORD_3 }}
+      PLAYBYPOINT_EMAIL_4: ${{ secrets.PLAYBYPOINT_EMAIL_4 }}
+      PLAYBYPOINT_PASSWORD_4: ${{ secrets.PLAYBYPOINT_PASSWORD_4 }}
+      PLAYBYPOINT_R2_ACCOUNT_ID: ${{ secrets.PLAYBYPOINT_R2_ACCOUNT_ID }}
+      PLAYBYPOINT_R2_BUCKET: ${{ secrets.PLAYBYPOINT_R2_BUCKET }}
+      PLAYBYPOINT_R2_PLAYER_IDS_KEY: ${{ secrets.PLAYBYPOINT_R2_PLAYER_IDS_KEY }}
+      PLAYBYPOINT_R2_ACCESS_KEY_ID: ${{ secrets.PLAYBYPOINT_R2_ACCESS_KEY_ID }}
+      PLAYBYPOINT_R2_SECRET_ACCESS_KEY: ${{ secrets.PLAYBYPOINT_R2_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Test booking parser
+        run: npm run test:bookings
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Transfer next week's bookings to cred 1
+        id: lookup
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: android-desktop
+          arch: x86_64
+          force-avd-creation: true
+          disable-animations: true
+          emulator-options: "-no-window -no-audio -no-boot-anim -no-metrics -gpu swiftshader_indirect -feature -Vulkan"
+          script: bash scripts/check-active-bookings-ci.sh
+      - name: Upload booking report and saved replacement payloads
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: active-bookings-cred-${{ inputs.credential_set }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/*.json
+          if-no-files-found: warn
+          retention-days: 7

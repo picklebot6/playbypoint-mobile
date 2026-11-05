@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "main": "bash -c 'source scripts/playbypoint-credentials.local.sh && export PLAYBYPOINT_EMAIL PLAYBYPOINT_PASSWORD PLAYBYPOINT_EMAIL_2 PLAYBYPOINT_PASSWORD_2 PLAYBYPOINT_EMAIL_3 PLAYBYPOINT_PASSWORD_3 PLAYBYPOINT_EMAIL_4 PLAYBYPOINT_PASSWORD_4 && if [ -f scripts/playbypoint-r2.local.sh ]; then set -a; source scripts/playbypoint-r2.local.sh || exit; set +a; fi && tsx src/browser/main.ts'"
+    "main": "bash -c 'source scripts/playbypoint-credentials.local.sh && export PLAYBYPOINT_EMAIL PLAYBYPOINT_PASSWORD PLAYBYPOINT_EMAIL_2 PLAYBYPOINT_PASSWORD_2 PLAYBYPOINT_EMAIL_3 PLAYBYPOINT_PASSWORD_3 PLAYBYPOINT_EMAIL_4 PLAYBYPOINT_PASSWORD_4 && if [ -f scripts/playbypoint-r2.local.sh ]; then set -a; source scripts/playbypoint-r2.local.sh || exit; set +a; fi && tsx src/browser/main.ts'",
+    "bookings:active": "node --import tsx src/bookings/main.ts",
+    "test:bookings": "node --import tsx --test tests/bookings/*.test.ts",
+    "bookings:resume": "node --import tsx src/bookings/main.ts --resume"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +18,8 @@
     "appium": "^3.6.0",
     "appium-uiautomator2-driver": "^8.5.2",
     "tsx": "^4.23.13",
-    "webdriverio": "^9.31.5"
+    "webdriverio": "^9.31.5",
+    "cheerio": "1.2.0"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1150.0"

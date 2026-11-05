@@ -11,3 +11,4 @@ scripts/playbypoint-r2.local.sh
 *.jks
 *.keystore
 *.png
+reports/

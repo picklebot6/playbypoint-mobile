@@ -109,7 +109,7 @@ function parseTimeRange(timeRange: string): {
   };
 }
 
-function getBookingDate(): string {
+export function getBookingDate(): string {
   const pacificDate = new Date().toLocaleDateString("en-CA", {
     timeZone: "America/Los_Angeles",
   });
@@ -125,7 +125,7 @@ function getBookingDate(): string {
   return bookingDate.toISOString().slice(0, 10);
 }
 
-function getCourtId(court: string): number {
+export function getCourtId(court: string): number {
   const courtNumber = Number(court);
 
   if (
@@ -139,7 +139,7 @@ function getCourtId(court: string): number {
   return 5594 + courtNumber;
 }
 
-function createBookingPayload(
+export function createBookingPayload(
   desiredTime: string,
   primary: string,
   secondary: string,
