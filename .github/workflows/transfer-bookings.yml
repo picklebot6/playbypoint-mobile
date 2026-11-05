@@ -84,7 +84,7 @@ jobs:
     needs: check-day
     if: ${{ needs.check-day.outputs.should_run == 'true' }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 35
+    timeout-minutes: 50
     outputs:
       active_count: ${{ steps.lookup.outputs.active_count }}
       target_date: ${{ steps.lookup.outputs.target_date }}
@@ -105,10 +105,10 @@ jobs:
       PLAYBYPOINT_R2_ACCESS_KEY_ID: ${{ secrets.PLAYBYPOINT_R2_ACCESS_KEY_ID }}
       PLAYBYPOINT_R2_SECRET_ACCESS_KEY: ${{ secrets.PLAYBYPOINT_R2_SECRET_ACCESS_KEY }}
     steps:
-      - name: Random delay of 0–15 minutes
+      - name: Random delay of 1–30 minutes
         shell: bash
         run: |
-          delay_seconds=$(python3 -c 'import secrets; print(secrets.randbelow(901))')
+          delay_seconds=$(python3 -c 'import secrets; print(60 + secrets.randbelow(1741))')
           echo "Waiting ${delay_seconds} seconds before starting the transfer workflow."
           sleep "$delay_seconds"
       - uses: actions/checkout@v6
