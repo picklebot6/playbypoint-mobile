@@ -4,7 +4,7 @@ import { bookSavedReservationWithRetries, RebookingError } from "../browser/book
 import { fetchActiveBookings } from "../browser/fetch-active-bookings";
 import { clearBookingReport, createBookingReport, saveBookingReport } from "./report";
 import { BookingPayloadError, logBookingPayloads } from "./booking-payload";
-import { cancelReservationAPI } from "../browser/cancel-reservation";
+import { cancelReservationAPI, CancellationError } from "../browser/cancel-reservation";
 import { createTransferPlan, saveTransferPlan } from "./transfer-plan";
 import { navigateToBooking } from "../browser/navigate-to-booking";
 import { resumeSavedTransfer } from "./resume";
@@ -70,8 +70,11 @@ async function main() {
       await cancelReservationAPI(browser, entry.request.sourceReservationId);
     } catch (error) {
       entry.status = "failed_or_unknown";
-      if (error instanceof RebookingError) entry.lastError = error.message;
-      await saveTransferPlan(plan);
+      if (error instanceof CancellationError) {
+        entry.lastError = error.message;
+        console.error(`Cancellation failed for ${entry.request.sourceReference} (internal ID ${entry.request.sourceReservationId}, HTTP ${error.httpStatus || "unavailable"}, request sent or possibly sent: ${error.requestSent}).`);
+      }
+      await saveTransferPlan(plan).catch(() => console.warn("Could not save cancellation failure details; the existing payload is preserved."));
       throw error;
     }
     entry.status = "cancelled";
@@ -117,7 +120,7 @@ if (require.main === module) {
   main().catch(error => {
     // Do not dump WebDriver errors: they can include credential-bearing commands.
     console.error(`Booking lookup failed during ${phase}. Check credentials, browser/network availability, and reservation page format.`);
-    if (error instanceof BookingPayloadError || error instanceof RebookingError || error instanceof BrowserLoginError) console.error(error.message);
+    if (error instanceof BookingPayloadError || error instanceof RebookingError || error instanceof BrowserLoginError || error instanceof CancellationError) console.error(error.message);
     process.exitCode = 1;
   });
 }
